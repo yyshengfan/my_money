@@ -1,0 +1,14 @@
+{
+    "type": "mysql",
+    "host": "k8s-istiosys-risktest-8320a1b63f-0e68ef52f61bb987.elb.ap-southeast-1.amazonaws.com",
+    "port": 3309,
+    "username": "root",
+    "password": "mysql.cht-devbase",
+    "database": "my_account",
+    "entities": ["src/entity/**/*.ts"],
+    "synchronize": false,
+    "cli": {
+      "entitiesDir": "src/entity"
+    }
+  }
+  

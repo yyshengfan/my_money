@@ -1,0 +1,15 @@
+{
+  "keep": {
+    "days": true,
+    "amount": 7
+  },
+  "auditLog": "/Users/sh00915ml/hui/my_money/logs/my-midway-project/.audit/.bce5b0cba2111f95f984cf900c209b89c39dd9e7-audit.json",
+  "files": [
+    {
+      "date": 1716986363262,
+      "name": "/Users/sh00915ml/hui/my_money/logs/my-midway-project/midway-app.log.2024-05-29",
+      "hash": "14735a7377a1ab6e25803ee9182de5a1"
+    }
+  ],
+  "hashType": "md5"
+}
