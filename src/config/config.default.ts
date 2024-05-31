@@ -19,12 +19,12 @@ export default {
     dataSource: {
       datasource1: {
         name: 'datasource1',
-        host: 'k8s-istiosys-risktest-8320a1b63f-0e68ef52f61bb987.elb.ap-southeast-1.amazonaws.com',
+        host: '127.0.0.1',
         type: 'mysql',
-        port: 3309,
+        port: 3306,
         username: 'root',
-        password: 'mysql.cht-devbase',
-        database: 'my_account',
+        password: 'Th21211314~~',
+        database: 'tianhuiaccount',
         entities: [Money],
         synchronize: false,
         logging: true,
