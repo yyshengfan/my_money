@@ -44,9 +44,8 @@ export class MoneyService {
     moneyNew.stockProfit = params.stockAmount - money.stockAmount;
     moneyNew.time = moment().format('YYYY-MM-DD');
 
-    // 计算其他
+    // 计算其他 总和
     moneyNew.money =
-      params.inmoney +
       params.periodical +
       params.fund +
       params.bitAmount +
@@ -54,16 +53,19 @@ export class MoneyService {
       params.zfbAmount -
       params.credit;
 
+
+    moneyNew.increment = moneyNew.money - money.money;
+    // 总支出
+    moneyNew.outmoneyCons = moneyNew.inmoney - moneyNew.increment;
+
+
+    // 净支出
     moneyNew.outmoneyNet =
-      moneyNew.inmoney -
-      money.increment -
+      moneyNew.outmoneyCons -
       params.outmoneyOther -
       params.outmoneyRent -
       params.outmoneyMortgage -
       params.outmoneySocialSecurity;
-
-    moneyNew.increment = moneyNew.money - money.money;
-    moneyNew.outmoneyCons = moneyNew.inmoney - money.increment;
 
     const res = await this.money.insert(moneyNew);
     return res;
