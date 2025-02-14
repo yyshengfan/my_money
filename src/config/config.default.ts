@@ -1,11 +1,3 @@
-/*
- * @Author: hui.tian hui.tian@yijinin.com
- * @Date: 2024-05-16 11:00:58
- * @LastEditors: hui.tian hui.tian@yijinin.com
- * @LastEditTime: 2024-05-28 18:26:13
- * @FilePath: /my_money/src/config/config.default.ts
- * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
- */
 import { MidwayConfig } from '@midwayjs/core';
 import { Money } from '../entity/entities/Money';
 
@@ -19,12 +11,16 @@ export default {
     dataSource: {
       datasource1: {
         name: 'datasource1',
-        host: '127.0.0.1',
+        // host: '127.0.0.1',
+        host: 'unify-test-3.cluster-cz8dkjxh2flz.ap-southeast-1.rds.amazonaws.com',
         type: 'mysql',
         port: 3306,
-        username: 'root',
-        password: 'Th21211314~~',
-        database: 'tianhuiaccount',
+        // username: 'root',
+        username: 'app_user',
+        // password: 'Th21211314~~',
+        password: 'PLO75FbcfmFYRuQEGmygZ9PyQCQbmgeD5',
+        // database: 'tianhuiaccount',
+        database: 'bybit_taie_test',
         entities: [Money],
         synchronize: false,
         logging: true,
