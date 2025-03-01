@@ -40,8 +40,13 @@ export class MoneyService {
 
     // 计算理财
     moneyNew.zfbProfit = params.zfbAmount - money.zfbAmount;
+    moneyNew.fundProfit = params.fund - money.fund;
     moneyNew.bitProfit = params.bitAmount - money.bitAmount;
     moneyNew.stockProfit = params.stockAmount - money.stockAmount;
+
+    // 总盈亏
+    moneyNew.sumProfit = moneyNew.zfbProfit + moneyNew.fundProfit + moneyNew.bitProfit + moneyNew.stockProfit;
+
     moneyNew.time = moment().format('YYYY-MM-DD');
 
     // 计算其他 总和
@@ -58,14 +63,14 @@ export class MoneyService {
     // 总支出
     moneyNew.outmoneyCons = moneyNew.inmoney - moneyNew.increment;
 
-
     // 净支出
     moneyNew.outmoneyNet =
       moneyNew.outmoneyCons -
       params.outmoneyOther -
       params.outmoneyRent -
       params.outmoneyMortgage -
-      params.outmoneySocialSecurity;
+      params.outmoneySocialSecurity -
+      moneyNew.sumProfit;
 
     const res = await this.money.insert(moneyNew);
     return res;

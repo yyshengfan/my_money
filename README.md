@@ -43,4 +43,6 @@ $ npm start
 3. npm install -g typeorm-model-generator
 4. typeorm-model-generator -h k8s-istiosys-risktest-8320a1b63f-0e68ef52f61bb987.elb.ap-southeast-1.amazonaws.com -p 3309 -d my_account -u root -x mysql.cht-devbase -e mysql -o ./src/entity
 
+4. typeorm-model-generator -h devtest-risk-common-mysql-cluster.master.devtest-storage.ww5sawfyut0k.bitsvc.io -p 3306 -d ty_test -u app_user -x PLO75FbcfmFYRuQEGmygZ9PyQCQbmgeD5 -e mysql -o ./src/entity
+
 
