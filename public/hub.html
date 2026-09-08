@@ -3,79 +3,164 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>财富门户</title>
+<title>投资雷达</title>
 <link rel="stylesheet" href="theme.css">
 <style>
-  /* 页面私有样式;共用规格见 theme.css */
-  main{display:grid;gap:14px;grid-template-columns:repeat(2,1fr)}
-  @media(max-width:760px){main{grid-template-columns:1fr}}
-  a.card{display:block;text-decoration:none;color:inherit;padding:22px 24px;position:relative;transition:border-color .15s}
-  a.card:hover{border-color:#28476e}
-  a.card:focus-visible{outline:2px solid var(--asset);outline-offset:2px}
-  .card .eyebrow{margin-bottom:8px}
-  .card h2{font-size:19px;font-weight:600;letter-spacing:.02em}
-  .card p{margin-top:9px;font-size:13px;line-height:1.7;color:var(--ink-2)}
-  .tag{position:absolute;top:20px;right:22px;font:500 10.5px/1 var(--mono);letter-spacing:.08em;color:var(--ink-2);border:1px solid var(--border);border-radius:999px;padding:5px 10px}
-  .tag.lock{color:#e0b458;border-color:#4a3c1e}
-  .sub{margin-top:14px;font:500 12px/1 var(--mono);color:var(--asset)}
+  /* 首页私有样式(令牌见 theme.css)。总览页为跨市场雷达:统一配色便于一眼对比。
+     A股小列/币圈小列仍各按本市场习惯着色,戳进对应雷达页颜色一致。 */
+  body{max-width:1240px}
+  header{gap:14px}
+  .brand{display:flex;align-items:center;gap:9px}
+  .brand .dot{width:9px;height:9px;border-radius:50%;background:var(--up);box-shadow:0 0 10px var(--up);animation:blink 2.4s ease-in-out infinite}
+  h1{font-size:16px;letter-spacing:.06em}
+  @keyframes blink{0%,100%{opacity:1}50%{opacity:.35}}
+  nav{display:flex;gap:2px;flex-wrap:wrap}
+  nav a{font:500 12px/1 var(--mono);color:var(--ink-2);text-decoration:none;padding:8px 11px;border-radius:8px;letter-spacing:.02em}
+  nav a:hover{color:var(--ink);background:#111923}
+  nav a.on{color:#7fd7ff;background:#0e1c2b}
+  nav .lk{font-size:9px;opacity:.7;vertical-align:1px}
   .who{margin-left:auto;display:flex;align-items:center;gap:10px;font:400 12px/1 var(--mono);color:var(--ink-2)}
+  main{display:grid;gap:14px}
+  .mktrow{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:stretch}
+  @media(max-width:900px){.mktrow{grid-template-columns:1fr}}
+  .rowhead{display:flex;align-items:flex-end;gap:10px}
+  .rowhead .go{margin-left:auto;font:500 11px/1 var(--mono);color:var(--asset);text-decoration:none;padding-bottom:2px}
+  .rowhead .go:hover{text-decoration:underline}
+  h2{font-size:15px}
+
+  /* ① MARKET PULSE 英雄条 */
+  .pulse{display:grid;grid-template-columns:minmax(0,1.5fr) auto;gap:22px;align-items:center;padding:26px 28px;position:relative;overflow:hidden;
+    background:linear-gradient(120deg,#0e1a26 0%,#10151c 55%,#10151c 100%);border-color:#16263a}
+  .pulse::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.5;
+    background:radial-gradient(600px 120px at 12% -20%,rgba(88,214,141,.10),transparent 60%),
+               radial-gradient(500px 130px at 88% -10%,rgba(79,140,255,.10),transparent 60%)}
+  .pulse::after{content:"";position:absolute;top:0;left:0;right:0;height:1px;
+    background:linear-gradient(90deg,transparent,rgba(88,214,141,.7),rgba(79,140,255,.7),transparent)}
+  @media(max-width:760px){.pulse{grid-template-columns:1fr}}
+  .hl{font-size:clamp(21px,2.6vw,30px);font-weight:600;letter-spacing:.01em;line-height:1.3;margin-top:10px}
+  .hl .hd{font-size:clamp(12px,1.3vw,14px);font-weight:500;letter-spacing:.02em;opacity:.9}
+  .hl small{display:block;font:400 11px/1.6 var(--mono);color:var(--ink-2);margin-top:9px}
+  .guages{display:flex;gap:26px;justify-content:center}
+  @media(max-width:760px){.guages{justify-content:flex-start}}
+  .gauge{display:flex;align-items:center;gap:13px;position:relative;z-index:1}
+  .ring{--p:0;--c:var(--asset);position:relative;width:78px;height:78px;flex:none;border-radius:50%;
+    background:conic-gradient(var(--c) calc(var(--p)*1%),#16202d 0)}
+  .ring::after{content:"";position:absolute;inset:9px;border-radius:50%;background:#0b1016}
+  .ring b{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:1;font:700 21px/1 var(--mono)}
+  .ring i{position:absolute;left:0;right:0;top:46px;text-align:center;z-index:1;font:500 8px/1 var(--mono);color:var(--ink-2);letter-spacing:.08em}
+  .gl .t{font:600 13px/1 var(--sans);display:block}
+  .gl .s{font:400 10.5px/1 var(--mono);color:var(--ink-2);margin-top:6px;display:block}
+
+  /* 行情列:大字行情行 */
+  .mkt .inner{padding:8px 0 2px}
+  .qrow{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:14px;align-items:baseline;padding:11px 18px}
+  .qrow+.qrow{border-top:1px dashed #151e29}
+  .qrow .nm{font-weight:600;font-size:13.5px;display:flex;align-items:baseline;gap:8px;min-width:0}
+  .qrow .nm .sym{font:400 10px/1 var(--mono);color:var(--ink-2)}
+  .qrow .pv{font:600 clamp(17px,2vw,22px)/1 var(--mono);text-align:right}
+  .qrow .ch{font:600 12.5px/1 var(--mono);text-align:right;min-width:74px}
+  .strip{display:flex;flex-wrap:wrap;gap:0;border-top:1px solid var(--border);margin-top:6px}
+  .sb{padding:11px 18px;min-width:92px}
+  .sb .k{font:400 10px/1 var(--mono);color:var(--ink-2);letter-spacing:.05em}
+  .sb .v{font:600 14.5px/1 var(--mono);margin-top:6px;display:block}
+
+  /* 今日信号 */
+  .sigs{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px;padding:14px 18px 16px}
+  .sig{border:1px solid var(--border);border-radius:9px;background:#0d131c;padding:12px 13px;display:grid;grid-template-columns:auto 1fr;gap:4px 11px;align-items:start}
+  .sig .dot{font-size:15px;line-height:1.4}
+  .sig .lead{font-weight:600;font-size:13px;line-height:1.45}
+  .sig .sub{grid-column:2;font:400 11px/1.6 var(--mono);color:var(--ink-2)}
+  .sig .val{grid-column:2;font:700 16px/1 var(--mono);margin-top:7px}
+
+  /* 机会两列 */
+  .oppwrap{display:grid;gap:0}
+  .opprow{display:grid;grid-template-columns:26px minmax(0,1fr) auto;gap:12px;align-items:center;padding:10px 18px}
+  .opprow+.opprow{border-top:1px dashed #151e29}
+  .opprow .rk{font:600 12px/1 var(--mono);color:var(--ink-2)}
+  .opprow .nm{font-weight:600;font-size:13px;display:flex;align-items:center;gap:8px;min-width:0}
+  .opprow .nm .sc{font:600 9.5px/1 var(--mono);color:#ffd25e;background:#2a2413;border-radius:99px;padding:3px 6px;letter-spacing:.03em}
+  .opprow .nm .sc.hi{background:#3a2f10}
+  .opprow .why{grid-column:2;font:400 10.5px/1.6 var(--mono);color:var(--ink-2);margin-top:1px}
+  .opprow .v{font:700 16px/1 var(--mono);text-align:right}
+  .note{padding:8px 18px 12px;font:400 10.5px/1.6 var(--mono);color:var(--ink-2)}
+  .rna{color:var(--down)} .gna{color:var(--up)}          /* A股:红涨绿跌 */
+  .cup{color:var(--up)} .cdn{color:var(--down)}           /* 币圈:绿涨红跌 */
+  .dim{color:var(--ink-2)}
 </style>
 </head>
 <body>
 <header>
-  <h1>财富门户</h1>
+  <div class="brand"><span class="dot"></span><h1>投资雷达</h1></div>
+  <nav>
+    <a class="on" href="hub.html">总览</a>
+    <a href="stock.html">A股</a>
+    <a href="crypto.html">币圈</a>
+    <a href="dashboard.html">我的财富<span class="lk">🔒</span></a>
+    <a href="cashflow.html">流水<span class="lk">🔒</span></a>
+    <a href="holdings.html">持仓<span class="lk">🔒</span></a>
+  </nav>
   <div class="who" id="who">…</div>
 </header>
-<div class="status">四个板块 · 个人财务与持仓需登录 · 大A与币圈公开可看</div>
+<div class="status" id="status">加载中…</div>
 
 <main>
-  <a class="panel card" href="dashboard.html">
-    <span class="tag lock">登录</span>
-    <div class="eyebrow">Personal Finance</div>
-    <h2>我的财富</h2>
-    <p>总资产、钱在哪里、财富趋势、每期变化与收支现金流</p>
-    <div class="sub">账本快照 →</div>
-  </a>
-  <a class="panel card" href="cashflow.html">
-    <span class="tag lock">登录</span>
-    <div class="eyebrow">Cashflow Ledger</div>
-    <h2>资金流水</h2>
-    <p>按月看进账、显性支出与当月流水明细</p>
-    <div class="sub">逐月对账 →</div>
-  </a>
-  <a class="panel card" href="stock.html">
-    <span class="tag">公开</span>
-    <div class="eyebrow">A-Share Radar</div>
-    <h2>大A股票</h2>
-    <p>指数与涨跌家数 → 板块资金 → 今日机会(启发式 Top6)→ 涨停池与异动 → 重要资讯,免费现源</p>
-    <div class="sub">六层看盘 →</div>
-  </a>
-  <a class="panel card" href="crypto.html">
-    <span class="tag">公开</span>
-    <div class="eyebrow">Crypto Radar</div>
-    <h2>币圈</h2>
-    <p>市场概览 → 恐慌贪婪与资金费率 → BTC/ETH ETF 资金流 → 链上与风险监控 → 活动与相关新闻,免费现源</p>
-    <div class="sub">深度研究 →</div>
-  </a>
-  <a class="panel card" href="holdings.html">
-    <span class="tag lock">登录</span>
-    <div class="eyebrow">Holdings Recap</div>
-    <h2>股票持仓</h2>
-    <p>我的 11 只持仓清单与实时报价(A股 + 港股)</p>
-    <div class="sub">持仓 →</div>
-  </a>
-</main>
+  <!-- ① Market Pulse -->
+  <section class="panel pulse">
+    <div>
+      <div class="eyebrow">MARKET PULSE · 跨市场氛围</div>
+      <div class="hl" id="pulse-hl"><span class="hd">…</span></div>
+    </div>
+    <div class="guages" id="pulse-g"></div>
+  </section>
 
-<p class="foot">v1 框架版:各板块先打通数据与页面骨架,后续逐板块细化。个人财务板块另有「我的财富 ⇄ 资金流水」互链。</p>
-<script>
-  fetch('/api/me').then(r => r.json()).then(j => {
-    const u = j?.data?.user;
-    document.getElementById('who').innerHTML = u
-      ? `已登录:${u.username} · <a class="navlink" href="#" id="logout">退出</a>`
-      : `<a class="navlink" href="login.html?back=hub.html">登录</a> 后可看个人财务与持仓`;
-    const lo = document.getElementById('logout');
-    if (lo) lo.onclick = async e => { e.preventDefault(); await fetch('/api/logout', { method: 'POST' }); location.reload(); };
-  }).catch(() => { document.getElementById('who').textContent = ''; });
-</script>
+  <!-- ② A股 / 币圈 核心行情 -->
+  <div class="mktrow">
+    <section class="panel mkt">
+      <div class="phead rowhead">
+        <div><div class="eyebrow">CHINA A-SHARE · 大陆</div><h2>A股</h2></div>
+        <a class="go" href="stock.html">进雷达 →</a>
+      </div>
+      <div class="inner" id="ashare-idx"><div class="note">加载中…</div></div>
+      <div class="strip" id="ashare-strip"></div>
+    </section>
+    <section class="panel mkt">
+      <div class="phead rowhead">
+        <div><div class="eyebrow">CRYPTO · 加密</div><h2>币圈</h2></div>
+        <a class="go" href="crypto.html">进雷达 →</a>
+      </div>
+      <div class="inner" id="crypto-idx"><div class="note">加载中…</div></div>
+      <div class="strip" id="crypto-strip"></div>
+    </section>
+  </div>
+
+  <!-- ③ Today's Signals -->
+  <section class="panel">
+    <div class="phead"><div class="eyebrow">TODAY'S SIGNALS · 直接告诉你发生了什么</div><h2>今日信号</h2></div>
+    <div class="sigs" id="signals"><div class="note">加载中…</div></div>
+  </section>
+
+  <!-- ④ Top Opportunities -->
+  <div class="mktrow">
+    <section class="panel">
+      <div class="phead rowhead">
+        <div><div class="eyebrow">A-SHARE · 资金/趋势/估值启发式</div><h2>A股机会</h2></div>
+        <a class="go" href="stock.html">全部 →</a>
+      </div>
+      <div class="oppwrap" id="oppA"></div>
+      <div class="note">启发式评分:主力净流入·走势·量价·估值(口径见 A股雷达页),非投资建议。</div>
+    </section>
+    <section class="panel">
+      <div class="phead rowhead">
+        <div><div class="eyebrow">CRYPTO · 24H MOMENTUM</div><h2>币圈动量</h2></div>
+        <a class="go" href="crypto.html">全部 →</a>
+      </div>
+      <div class="oppwrap" id="oppC"></div>
+      <div class="note">仅按 24h 涨跌幅排序(跟踪池内),非评分、非建议;资金/费率详情进币圈雷达。</div>
+    </section>
+  </div>
+
+  <p class="foot" id="footnote"></p>
+</main>
+<script src="hub.js"></script>
 </body>
 </html>

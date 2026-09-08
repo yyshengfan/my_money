@@ -76,7 +76,7 @@ npm start          # 生产启动(bootstrap.js)
 
 ## 四板块扩展 v1(2026-09)
 
-门户 `public/hub.html` 五卡片:①我的财富(dashboard,需登录)②资金流水(cashflow,需登录)③大A(stock,公开)④币圈(crypto,公开)⑤股票持仓(holdings,需登录)。全部复用 theme.css 深色规格。
+**首页 `public/hub.html`+`public/hub.js`(2026-09 改为"投资雷达",不再是卡片门户)**:公开页,复用 theme.css 深色规格。顶栏链到 A股/币圈/我的财富🔒(dashboard)/流水🔒(cashflow)/持仓🔒(holdings)。四区:① MARKET PULSE(一句话氛围 + 两个 conic-gradient 圆环仪表:A股温度 / 币圈恐慌贪婪)② 双列行情(A股 上证/深成/创业板指 红涨绿跌 + 币圈 BTC/ETH/SOL 绿涨红跌,各带小条)③ 今日信号(≤5 条派生事实,涨停情绪/温度/成交/上涨占比/恐慌贪婪/市值24h/领涨币)④ A股机会(score chip 抄 stock.js oppScore,无 indPct 故不挂"板块强势")+ 币圈动量(24h 涨幅 top3,非评分)。只消费已有公开端点:`/api/stock/market` `/api/stock/opportunity` `/api/crypto/overview` `/api/me`(右上登录 chip)。纯函数顶层可 `node public/hub.js` 自检。公式与页面一致:aTemp(抄 stock marketTemp:指数40/涨跌家数40/涨停跌停20,缺项剔权重)、fngLabel/fngColor(抄 crypto.js)、pulseTone、heatColor。A股/币圈各列按本市场习惯着色,总览其余色块绿=暖/升、红=冷/跌。⚠️ 负数百分号:`sp()` 只补 `+`,负号靠 `.toFixed()` 自带,否则会显示 `--1%`(已修,勿改回)。海外源挂代理期间币圈列可能短暂全 ✗,60s 自愈重试。
 
 - **登录**:`@midwayjs/session` cookie session;`AuthMiddleware` 只守数据 API(正则 `/^\/(money|api\/holding)(\/|$)/` → 401 JSON),静态 HTML 不守,页面 JS 收 401 跳 `login.html?back=本页`。密码 scrypt(`salt:hex`),哈希生成:`node -e "console.log(require('./dist/service/auth.service').hashPassword('密码'))"`。
 - **建表/种子**:`node scripts/seed_v1.js`(幂等,从 config 读密码,执行 data/mysql.sql 的"四板块 v1"段)→ 建 `users` + `holding`(已灌 11 只自选,含 2 港股)。users 行手工插(占位 INSERT 在 data/mysql.sql 注释里)。
