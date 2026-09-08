@@ -21,8 +21,4 @@ export class UserService {
     const money = await this.money.find();
     return money;
   }
-  async createNew() {
-    const money = await this.money.create();
-    return money;
-  }
 }

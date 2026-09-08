@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>我的财富</title>
+<link rel="stylesheet" href="theme.css">
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
+<style>
+  /* 页面私有样式;共用规格见 theme.css */
+  main{display:grid;gap:14px}
+
+  /* 第一屏:英雄区 */
+  .hero{display:grid;gap:14px;grid-template-columns:1fr}
+  @media(min-width:1100px){.hero{grid-template-columns:1.6fr 1fr 1.4fr}}
+  .hero-main{padding:20px 22px}
+  .hero-main .label{font:500 11px/1 var(--mono);letter-spacing:.14em;color:var(--ink-2);text-transform:uppercase}
+  .hero-total{font:600 clamp(34px,4.5vw,46px)/1.1 var(--mono);letter-spacing:-.02em;margin:12px 0 14px;color:var(--asset)}
+  .hero-deltas{display:flex;gap:22px;flex-wrap:wrap}
+  .delta .dk{font:400 11px/1 var(--mono);color:var(--ink-2);margin-bottom:6px}
+  .delta .dv{font:600 15px/1.2 var(--mono)}
+  .pos{color:var(--up)} .neg{color:var(--down)}
+  .kpis{display:grid;gap:14px;grid-template-rows:1fr 1fr}
+  .kpi{padding:14px 18px;display:flex;flex-direction:column;justify-content:center;gap:8px}
+  .kpi .dk{font:500 10px/1 var(--mono);letter-spacing:.14em;color:var(--ink-2);text-transform:uppercase}
+  .kpi .dv{font:600 20px/1.2 var(--mono)}
+  .kpi .sub{font:400 11px/1 var(--mono);color:var(--ink-2)}
+  .alloc{display:grid;grid-template-columns:150px 1fr;align-items:center;gap:6px}
+  #donut{height:180px}
+  .alloc-list{padding:10px 14px 10px 0;display:grid;gap:8px}
+  .arow{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center;font-size:12px}
+  .arow .dot{width:8px;height:8px;border-radius:99px;display:inline-block;margin-right:8px}
+  .arow .amt{font:500 12px/1 var(--mono);color:var(--ink-2)}
+  .arow .pct{font:600 12px/1 var(--mono);min-width:42px;text-align:right}
+
+  /* 趋势区 */
+  .row2{display:grid;gap:14px;grid-template-columns:1fr}
+  @media(min-width:1100px){.row2{grid-template-columns:1.5fr 1fr}}
+  .chart{height:320px}
+  .chart-tall{height:340px}
+
+  /* 堆叠开关 */
+  .toggle{float:right;margin-top:-30px;margin-right:16px}
+  .toggle button{font:500 11px/1 var(--mono);color:var(--ink-2);background:transparent;border:1px solid var(--border);border-radius:999px;padding:5px 10px;cursor:pointer}
+  .toggle button.on{color:var(--asset);border-color:#28476e}
+
+  /* 排行榜 */
+  .rank{padding:12px 18px 16px;display:grid;gap:10px}
+  .rrow{display:grid;grid-template-columns:64px 1fr 88px 74px;gap:10px;align-items:center;font-size:12.5px}
+  .rrow .bar{height:6px;border-radius:3px;background:#161d27;position:relative;overflow:hidden}
+  .rrow .bar i{position:absolute;top:0;bottom:0;left:50%;border-radius:3px}
+  .rrow .bar::after{content:"";position:absolute;left:50%;top:-2px;bottom:-2px;width:1px;background:#26313d}
+  .rrow .rv,.rrow .rp{font:500 12px/1 var(--mono);text-align:right}
+
+  /* 收支小票 */
+  .cashstrip{display:flex;gap:22px;padding:12px 18px 0;flex-wrap:wrap}
+  .cashstrip .cs{display:grid;gap:5px}
+  .cashstrip .ck{font:400 11px/1 var(--mono);color:var(--ink-2)}
+  .cashstrip .cv{font:600 14px/1 var(--mono)}
+
+  /* 分类 chips */
+  .cats{display:flex;gap:8px;padding:12px 18px 0;flex-wrap:wrap}
+  .cats button{font:500 11.5px/1 var(--mono);color:var(--ink-2);background:transparent;border:1px solid var(--border);border-radius:999px;padding:6px 12px;cursor:pointer}
+  .cats button.on{color:var(--ink);border-color:currentColor}
+  .cdot{display:inline-block;width:7px;height:7px;border-radius:99px;margin-right:6px;vertical-align:1px}
+</style>
+</head>
+<body>
+<header>
+  <h1>我的财富</h1>
+  <a class="navlink" href="hub.html">← 门户</a>
+  <a class="navlink" href="cashflow.html">资金流水 →</a>
+  <div class="pills" id="range" aria-label="时间范围" title="全局时间窗(月/季/半年/年图与排行榜共用)">
+    <button data-r="3">3M</button><button data-r="6">6M</button><button data-r="12" class="on">1Y</button><button data-r="36">3Y</button><button data-r="0">ALL</button>
+  </div>
+  <div class="pills" id="gran" aria-label="统计粒度" title="图②③④的统计粒度(增量求和、金额取期末)">
+    <button data-g="month" class="on">月</button><button data-g="quarter">季</button><button data-g="half">半年</button><button data-g="year">年</button>
+  </div>
+</header>
+<div class="status" id="status">加载数据中…</div>
+
+<main>
+  <!-- 英雄区:总资产 = 视觉中心 -->
+  <section class="hero">
+    <div class="panel hero-main">
+      <div class="label">总资产 · 期末快照</div>
+      <div class="hero-total num" id="hero-total">—</div>
+      <div class="hero-deltas">
+        <div class="delta"><div class="dk" id="dk-inc">本期变化</div><div class="dv num" id="d-inc"></div></div>
+        <div class="delta"><div class="dk" id="dk-cum">入行以来</div><div class="dv num" id="d-cum"></div></div>
+      </div>
+    </div>
+    <div class="kpis">
+      <div class="panel kpi"><div class="dk">存款 · 零钱</div><div class="dv num" id="k-cash"></div><div class="sub">收支表 · 期末 periodical</div></div>
+      <div class="panel kpi"><div class="dk">本期净现金流</div><div class="dv num" id="k-net"></div><div class="sub">进账 − 支出</div></div>
+    </div>
+    <div class="panel">
+      <div class="phead"><div class="eyebrow">Allocation</div><h2>钱在哪里</h2></div>
+      <div class="alloc">
+        <div id="donut"></div>
+        <div class="alloc-list" id="alloc-list"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 财富增长趋势 + 本期涨跌排行 -->
+  <div class="row2">
+    <section class="panel">
+      <div class="phead"><div class="eyebrow">Wealth Trend</div><h2>财富增长趋势</h2></div>
+      <div class="chart" id="trend"></div>
+    </section>
+    <section class="panel">
+      <div class="phead"><div class="eyebrow">Period Movers</div><h2 id="rank-title">本期表现</h2></div>
+      <div class="rank" id="rank"></div>
+    </section>
+  </div>
+
+  <!-- 资产变化:默认总增量单柱,可展开小类堆叠 -->
+  <section class="panel">
+    <div class="phead"><div class="eyebrow">Period Delta</div><h2 id="delta-title">每月资产变化</h2></div>
+    <div class="toggle"><button id="stackbtn" aria-pressed="false">按小类堆叠</button></div>
+    <div class="chart-tall" id="delta"></div>
+  </section>
+
+  <!-- 收支与现金流 -->
+  <section class="panel">
+    <div class="phead"><div class="eyebrow">Cashflow</div><h2>收支与余额</h2></div>
+    <div class="cashstrip" id="cash-strip"></div>
+    <div class="chart" id="cashflow"></div>
+  </section>
+
+  <!-- 各小类明细趋势 -->
+  <section class="panel">
+    <div class="phead"><div class="eyebrow">Category Detail</div><h2>各小类明细趋势(期末值)</h2></div>
+    <div class="cats" id="cats"></div>
+    <div class="chart" id="catdetail"></div>
+  </section>
+</main>
+<script src="dashboard.js"></script>
+<script>loadAndRender();</script>
+</body>
+</html>

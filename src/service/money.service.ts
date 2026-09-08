@@ -1,87 +1,114 @@
-/*
- * @Author: hui.tian hui.tian@yijinin.com
- * @Date: 2024-05-16 11:00:58
- * @LastEditors: hui.tian hui.tian@yijinin.com
- * @LastEditTime: 2024-05-29 11:18:00
- * @FilePath: /my_money/src/service/user.service.ts
- * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
- */
-import { Provide } from '@midwayjs/core';
-import { InjectEntityModel } from '@midwayjs/typeorm';
-import { Money } from '../entity/entities/Money';
-import { Repository } from 'typeorm';
-import { MoneyDTO } from '../dto/money.dto';
-import moment = require('moment');
+import { Provide } from "@midwayjs/core";
+import { InjectEntityModel } from "@midwayjs/typeorm";
+import { Money } from "../entity/entities/Money";
+import { MoneyFinance } from "../entity/entities/MoneyFinance";
+import { Repository } from "typeorm";
+import { MoneyDTO } from "../dto/money.dto";
+import moment = require("moment");
 
 @Provide()
 export class MoneyService {
   // 这里一般会注入一个实体类对应的 Model，包含增删改查方法
-  @InjectEntityModel(Money, 'datasource1')
+  @InjectEntityModel(Money, "datasource1")
   money: Repository<Money>;
+  @InjectEntityModel(MoneyFinance, "datasource1")
+  moneyFinance: Repository<MoneyFinance>;
 
   async createNew(params: MoneyDTO) {
-    const money = await this.getlastRecord();
+    const resMoney = await this.money.find({
+      order: { id: "DESC" },
+      take: 1,
+    });
+    const resMoneyFinnance = await this.moneyFinance.find({
+      order: { id: "DESC" },
+      take: 1,
+    });
+    // 空表兜底:字段显式给 null,减法行为与真实 null 行一致
+    const money = resMoney[0] ?? { money: null, periodical: null };
+    const moneyFinance =
+      resMoneyFinnance[0] ??
+      { fund: null, bitAmount: null, stockAmount: null, zfbAmount: null, hkStock: null };
 
     const moneyNew = new Money();
+    const moneyFinanceNew = new MoneyFinance();
+
+    // finance
+    moneyFinanceNew.fund = params.fund;
+    moneyFinanceNew.bitAmount = params.bitAmount;
+    moneyFinanceNew.stockAmount = params.stockAmount;
+    moneyFinanceNew.zfbAmount = params.zfbAmount;
+    moneyFinanceNew.hkStock = params.hkStock;
+    moneyFinanceNew.comment = params.comment;
+    moneyFinanceNew.time = moment().format("YYYY-MM-DD");
+
+    // 计算理财
+    moneyFinanceNew.zfbIncrease = params.zfbAmount - moneyFinance.zfbAmount;
+    moneyFinanceNew.fundIncrease = params.fund - moneyFinance.fund;
+    moneyFinanceNew.bitIncrease = params.bitAmount - moneyFinance.bitAmount;
+    moneyFinanceNew.stockIncrease = params.stockAmount - moneyFinance.stockAmount;
+    moneyFinanceNew.hkStockIncrease = params.hkStock - moneyFinance.hkStock;
+    moneyFinanceNew.money = params.fund + params.bitAmount + params.stockAmount + params.hkStock + params.zfbAmount;
+    
+    // 总盈亏
+    moneyFinanceNew.sumIncrease =
+      moneyFinanceNew.zfbIncrease +
+      moneyFinanceNew.fundIncrease +
+      moneyFinanceNew.bitIncrease +
+      moneyFinanceNew.stockIncrease +
+      moneyFinanceNew.hkStockIncrease;
+    
     // 原声参数
     moneyNew.salary = params.salary;
     moneyNew.inmoney = params.inmoney;
     moneyNew.credit = params.credit;
     moneyNew.periodical = params.periodical;
-    moneyNew.fund = params.fund;
-    moneyNew.bitAmount = params.bitAmount;
-    moneyNew.stockAmount = params.stockAmount;
-    moneyNew.zfbAmount = params.zfbAmount;
+
+    // 支出
     moneyNew.comment = params.comment;
+    moneyNew.periodicalIncrease = params.periodical - money.periodical;
     moneyNew.outmoneyOther = params.outmoneyOther;
     moneyNew.outmoneyRent = params.outmoneyRent;
     moneyNew.outmoneyMortgage = params.outmoneyMortgage;
     moneyNew.outmoneySocialSecurity = params.outmoneySocialSecurity;
 
-    // 计算理财
-    moneyNew.zfbProfit = params.zfbAmount - money.zfbAmount;
-    moneyNew.fundProfit = params.fund - money.fund;
-    moneyNew.bitProfit = params.bitAmount - money.bitAmount;
-    moneyNew.stockProfit = params.stockAmount - money.stockAmount;
-
-    // 总盈亏
-    moneyNew.sumProfit = moneyNew.zfbProfit + moneyNew.fundProfit + moneyNew.bitProfit + moneyNew.stockProfit;
-
-    moneyNew.time = moment().format('YYYY-MM-DD');
+    moneyNew.time = moment().format("YYYY-MM-DD");
 
     // 计算其他 总和
-    moneyNew.money =
-      params.periodical +
-      params.fund +
-      params.bitAmount +
-      params.stockAmount +
-      params.zfbAmount -
-      params.credit;
+    moneyNew.money = params.periodical + moneyFinanceNew.money - params.credit;
 
+    // 总进帐
+    moneyNew.increment = moneyNew.money - money.money - moneyNew.credit;
 
-    moneyNew.increment = moneyNew.money - money.money;
-    // 总支出
+    // 总出帐
     moneyNew.outmoneyCons = moneyNew.inmoney - moneyNew.increment;
 
     // 净支出
     moneyNew.outmoneyNet =
-      moneyNew.outmoneyCons -
+      moneyNew.inmoney +
+      moneyFinanceNew.sumIncrease -
+      moneyNew.increment;
+
+    // 生活支出
+    moneyNew.outmoneyLife =
+      moneyNew.outmoneyNet -
       params.outmoneyOther -
       params.outmoneyRent -
       params.outmoneyMortgage -
-      params.outmoneySocialSecurity -
-      moneyNew.sumProfit;
+      params.outmoneySocialSecurity;
 
-    const res = await this.money.insert(moneyNew);
-    return res;
-  }
-
-  // 获取最后一条
-  async getlastRecord() {
-    const res = await this.money.find({
-      order: { id: 'DESC' },
-      take: 1,
+    // 事务:两张表要么都写入,要么都不写
+    return this.money.manager.transaction(async em => {
+      await em.insert(MoneyFinance, moneyFinanceNew);
+      return em.insert(Money, moneyNew);
     });
-    return res[0];
   }
+
+  // 全量查询,供 dashboard 前端聚合
+  async findAll() {
+    return {
+      finance: await this.moneyFinance.find({ order: { time: "ASC", id: "ASC" } }),
+      money: await this.money.find({ order: { time: "ASC", id: "ASC" } }),
+    };
+  }
+
 }

@@ -1,9 +1,3 @@
-/**
- * @description 描述
- * @author hui.tian
- * @date 2022-09-21 14:13:10
- * @last_modified_time 2022-09-21 14:13:10
- */
 import { Rule, RuleType } from '@midwayjs/validate';
 
 export class MoneyDTO {
@@ -31,6 +25,8 @@ export class MoneyDTO {
   outmoneyMortgage: number;
   @Rule(RuleType.number().max(999999999).required())
   outmoneySocialSecurity: number;
+  @Rule(RuleType.number().max(999999999).required())
+  hkStock: number;
   @Rule(RuleType.string().trim().max(255).required())
   comment: string;
 }

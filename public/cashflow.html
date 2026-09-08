@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>资金流水</title>
+<link rel="stylesheet" href="theme.css">
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
+<style>
+  /* 页面私有样式;共用规格(令牌/画布/顶栏/面板/pill/foot)见 theme.css */
+
+  /* 月份翻页:与 dashboard 同用 .pills,靠右控件区 */
+  .mwrap{margin-left:auto;display:flex;align-items:center;gap:10px}
+  .mwrap .pills{margin-left:0}
+  .mwrap .pills button{font-size:14px}
+  .mwrap .pills button:disabled{opacity:.3;cursor:default}
+  .pmonth{font:600 13px/1 var(--mono);letter-spacing:.05em;color:var(--ink);background:transparent;border:1px solid var(--border);border-radius:0;padding:7px 14px;min-width:96px;text-align:center}
+  .asof{font:400 11px/1 var(--mono);color:var(--ink-2)}
+
+  /* KPI 四卡 */
+  .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:14px}
+  @media(max-width:900px){.cards{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:520px){.cards{grid-template-columns:1fr}}
+  .card{padding:16px 18px;display:flex;flex-direction:column;gap:10px}
+  .card .dk{font:500 10px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--ink-2)}
+  .card .dv{font:600 30px/1.15 var(--mono);letter-spacing:-.01em}
+  .card .dv small{font-size:13px;font-weight:500;color:var(--ink-2);margin-left:3px}
+  .card .d{font:400 11.5px/1.4 var(--mono);color:var(--ink-2)}
+  .card .d b{font-weight:600}
+  .c-bal .dv{color:var(--asset)} .c-in .dv{color:var(--up)} .c-out .dv{color:var(--down)} .c-net .dv{color:var(--neutral)}
+  .good{color:var(--up)} .bad{color:var(--down)} .flat{color:var(--neutral)}
+
+  .row2{display:grid;gap:14px;grid-template-columns:1fr 1.6fr;margin-bottom:14px}
+  @media(max-width:900px){.row2{grid-template-columns:1fr}}
+  .phead .hint{font:400 11px/1.5 var(--mono);color:var(--ink-2);margin-top:5px}
+  #trend{height:320px}
+
+  /* 支出构成 */
+  .bars{padding:14px 18px 18px;display:grid;gap:12px}
+  .b{display:grid;grid-template-columns:64px 1fr 90px;gap:10px;align-items:center;font-size:12.5px}
+  .b .t{height:6px;border-radius:3px;background:#161d27;overflow:hidden}
+  .b .t i{display:block;height:100%;border-radius:3px;background:var(--down)}
+  .b .val{font:500 12.5px/1 var(--mono);text-align:right;color:var(--ink-2)}
+  .b.zero{opacity:.4}
+  .btot{display:flex;justify-content:space-between;padding:12px 18px;border-top:1px solid var(--border);font-size:12.5px;color:var(--ink-2)}
+  .btot b{font:600 14px/1 var(--mono);color:var(--down)}
+
+  /* 流水表 */
+  .tscroll{overflow-x:auto;padding:6px 18px 16px}
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  th{text-align:right;font:500 11px/1 var(--mono);letter-spacing:.05em;color:var(--ink-2);padding:9px 10px;border-bottom:1px solid var(--border);white-space:nowrap}
+  th:first-child,td:first-child{text-align:left}
+  td{padding:9px 10px;border-bottom:1px solid #151c26;text-align:right;white-space:nowrap;font-family:var(--mono);font-variant-numeric:tabular-nums}
+  tr:last-child td{border-bottom:none}
+  td.date{color:var(--ink-2)}
+  td.cmt{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:280px;text-align:left;font-family:var(--sans);color:var(--ink-2)}
+  td.money{color:var(--asset);font-weight:600}
+  .empty{color:var(--ink-2);font-size:13px;padding:18px 0;text-align:center}
+</style>
+</head>
+<body>
+  <header>
+    <h1>资金流水</h1>
+    <a class="navlink" href="hub.html">← 门户</a>
+    <a class="navlink" href="dashboard.html">← 我的财富</a>
+    <div class="mwrap">
+      <span class="asof" id="asof"></span>
+      <div class="pills" role="group" aria-label="月份翻页">
+        <button id="prev" aria-label="上一月">‹</button>
+        <span class="pmonth" id="mtitle">—</span>
+        <button id="next" aria-label="下一月">›</button>
+      </div>
+    </div>
+  </header>
+  <div class="status" id="status">加载数据中…</div>
+
+  <section class="cards">
+    <div class="panel card c-bal"><div class="dk">期末余额 · Balance</div><div class="dv num" id="v-bal">—<small>元</small></div><div class="d" id="d-bal"></div></div>
+    <div class="panel card c-in"><div class="dk">总进账 · In</div><div class="dv num" id="v-in">—<small>元</small></div><div class="d" id="d-in"></div></div>
+    <div class="panel card c-out"><div class="dk">显性支出 · Out</div><div class="dv num" id="v-out">—<small>元</small></div><div class="d" id="d-out"></div></div>
+    <div class="panel card c-net"><div class="dk">净结余 · Net</div><div class="dv num" id="v-net">—<small>元</small></div><div class="d">进账 − 显性支出</div></div>
+  </section>
+
+  <div class="row2">
+    <div class="panel">
+      <div class="phead"><div class="eyebrow">Expense Breakdown</div><h2>支出构成</h2><div class="hint">仅含账本显性字段,不掺理财盈亏</div></div>
+      <div class="bars" id="bars"></div>
+      <div class="btot"><span>合计</span><b class="num" id="b-tot"></b></div>
+    </div>
+    <div class="panel">
+      <div class="phead"><div class="eyebrow">Trend</div><h2 id="trend-title">近 12 个月走势</h2><div class="hint">柱=当月进账/显性支出,线=期末余额(右轴)</div></div>
+      <div id="trend"></div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="phead"><div class="eyebrow">Ledger</div><h2>当月流水</h2><div class="hint" id="thint"></div></div>
+    <div class="tscroll"><table id="tbl"></table></div>
+  </div>
+
+  <p class="foot">口径说明:账本字段「总出帐/生活开支」会把理财市值波动记进去(如 2026-05 备注含 A股/币亏损),本页一律不用,只呈现进账与显性支出(信用卡+房租+房贷+社保+其他)。支出环比箭头用中性色 —— 支出下降是好事,不标绿也不标红。</p>
+<script src="cashflow.js"></script>
+</body>
+</html>

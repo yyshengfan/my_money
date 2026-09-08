@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>币圈</title>
+<link rel="stylesheet" href="theme.css">
+<style>
+  /* 页面私有样式;共用规格见 theme.css */
+  main{display:grid;gap:14px}
+  /* 恐慌贪婪(窄)+ 资金费率矩阵(宽) */
+  .fundrow{display:grid;gap:14px;grid-template-columns:340px 1fr}
+  @media(max-width:900px){.fundrow{grid-template-columns:1fr}}
+  .src{padding:12px 18px 0;font:400 11.5px/1.6 var(--mono);color:var(--ink-2)}
+  .src .k{color:var(--up)} .src .x{color:var(--down)}
+
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{text-align:right;font:500 11px/1 var(--mono);letter-spacing:.05em;color:var(--ink-2);padding:10px 18px;border-bottom:1px solid var(--border);white-space:nowrap}
+  th:first-child,td:first-child{text-align:left}
+  td{padding:10px 18px;border-bottom:1px solid #151c26;text-align:right;white-space:nowrap;font-family:var(--mono);font-variant-numeric:tabular-nums}
+  tr:last-child td{border-bottom:none}
+  td.nm{color:var(--ink);font-weight:600}
+  .pos{color:var(--up)} .neg{color:var(--down)}
+  .gsum{display:flex;gap:26px;padding:14px 18px;border-top:1px solid var(--border);flex-wrap:wrap}
+  .gsum .g{display:grid;gap:5px}
+  .gsum .gk{font:400 11px/1 var(--mono);color:var(--ink-2)}
+  .gsum .gv{font:600 14px/1 var(--mono)}
+
+  /* 市值结构:五币占比条 */
+  .mcaps{padding:4px 18px 16px;border-top:1px solid var(--border)}
+
+  /* ETF 资金流:小结 ×4 + 曲线 */
+  .etf-sum{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;padding:14px 18px 4px}
+  @media(max-width:700px){.etf-sum{grid-template-columns:repeat(2,1fr)}}
+  .etf-sum .g{display:grid;gap:5px}
+  .etf-sum .gk{font:400 11px/1 var(--mono);color:var(--ink-2)}
+  .etf-sum .gv{font:600 17px/1 var(--mono)}
+  .etf-sum .gv small{font-size:11px;color:var(--ink-2);font-weight:400}
+  .etf-chart{width:100%}
+  .etf-note{padding:0 18px 16px;font:400 11.5px/1.7 var(--mono);color:var(--ink-2)}
+  .etf-ph{padding:30px 18px;color:var(--ink-2);font-size:13px;text-align:center}
+
+  /* 恐慌贪婪:折线 */
+  .fng-chart{width:100%;height:150px}
+  .fng-now{padding:0 18px 14px;font:400 11.5px/1.8 var(--mono);color:var(--ink-2)}
+
+  .ann{display:grid;grid-template-columns:repeat(4,1fr)}
+  @media(max-width:1000px){.ann{grid-template-columns:1fr}}
+  .ann .col{padding:14px 18px;border-left:1px solid var(--border)}
+  .ann .col:first-child{border-left:none}
+  @media(max-width:1000px){.ann .col{border-left:none;border-top:1px solid var(--border)}}
+  .ann h3{font:500 11px/1 var(--mono);letter-spacing:.1em;color:var(--ink-2);margin-bottom:10px}
+  .ann li{list-style:none;margin-bottom:10px}
+  .ann a{color:var(--ink);text-decoration:none;font-size:12.5px;line-height:1.5}
+  .ann a:hover{color:var(--asset)}
+  .ann .t{display:block;font:400 10.5px/1 var(--mono);color:var(--ink-2);margin-top:4px}
+  .ann .e{font:400 12px/1.6 var(--mono);color:var(--down)}
+
+  /* 资金费率:币种切换 + 每所折线 */
+  .fpills{display:flex;gap:6px;align-items:center;padding:12px 18px 2px}
+  .fpills span{font:400 10.5px/1 var(--mono);color:var(--ink-2);margin-right:2px}
+  .fpills button{border:1px solid var(--border);background:transparent;color:var(--ink-2);font:600 11px/1 var(--mono);padding:5px 12px;border-radius:99px;cursor:pointer}
+  .fpills button.on{background:var(--asset);border-color:var(--asset);color:#0b1220}
+  .fpills button:hover:not(.on){color:var(--ink)}
+  .fchart{width:100%;height:230px}
+  .fnote{padding:0 18px 14px;font:400 11px/1.7 var(--mono);color:var(--ink-2)}
+
+  /* 市值结构:饼图(左)+ 明细行(右,作图例) */
+  .mcaps .h{font:500 10px/1 var(--mono);letter-spacing:.14em;color:var(--ink-2);padding:12px 0 6px;text-transform:uppercase}
+  .mcapgrid{display:grid;grid-template-columns:280px 1fr;gap:6px 22px;align-items:center}
+  @media(max-width:760px){.mcapgrid{grid-template-columns:1fr}}
+  .mcapgrid .pie{width:100%;height:196px}
+  .mcap-list{display:grid;gap:7px;font-size:12.5px}
+  .mcap-row{display:flex;align-items:center;gap:9px;white-space:nowrap}
+  .mcap-row .dot{width:8px;height:8px;border-radius:2px;flex:none}
+  .mcap-row .sym{font-family:var(--mono);font-weight:600;color:var(--ink);min-width:38px}
+  .mcap-row .pct{font-family:var(--mono);color:var(--ink);min-width:44px}
+  .mcap-row .barx{flex:1;height:5px;min-width:60px;border-radius:3px;background:#1c2530;overflow:hidden}
+  .mcap-row .barx i{display:block;height:100%;background:var(--asset);border-radius:3px}
+  .mcap-row .cap{margin-left:auto;font-family:var(--mono);color:var(--ink-2);font-size:12px}
+  .mcap-row .chg{font-family:var(--mono);font-size:12px;min-width:54px;text-align:right}
+
+  /* 市场概览两栏化:左现货表+小结,右市值结构小栏(占比块缩小,整版更矮) */
+  .ovrow{display:grid;grid-template-columns:minmax(0,1fr) 340px}
+  @media(max-width:1000px){.ovrow{grid-template-columns:1fr}}
+  .ovleft{min-width:0}
+  .mcaps{display:flex;flex-direction:column;justify-content:center;gap:2px;padding:12px 16px;border-left:1px solid var(--border);border-top:none}
+  .mcaps .h{padding:0 0 8px}
+  .mcaps .mcapgrid{grid-template-columns:1fr}
+  .mcaps .mcapgrid .pie{height:126px}
+  .mcaps .mcap-list{font-size:11.5px;gap:6px}
+  .mcaps .mcap-row{gap:8px;padding:3px 0;font-size:11.5px}
+  .mcaps .mcap-row .sym{min-width:32px}
+  .mcaps .mcap-row .barx{min-width:40px}
+  .mcaps .mcap-row .cap{font-size:11px}
+  .mcaps .mcap-row .chg{font-size:11px;min-width:44px}
+  @media(max-width:1000px){
+    .mcaps{border-left:none;border-top:1px solid var(--border)}
+    .mcaps .mcapgrid{grid-template-columns:240px 1fr}
+    .mcaps .mcapgrid .pie{height:150px}
+  }
+  @media(max-width:760px){.mcaps .mcapgrid{grid-template-columns:1fr}.mcaps .mcapgrid .pie{height:126px}}
+
+  /* 相关新闻 & 宏观:左新闻 / 右宏观驱动清单 */
+  .newsgrid{display:grid;grid-template-columns:1fr 300px;gap:0}
+  @media(max-width:900px){.newsgrid{grid-template-columns:1fr}}
+  .news{display:grid;align-content:start;padding:4px 20px 8px 18px}
+  .news li{list-style:none;padding:11px 0;border-bottom:1px dashed #1a2330}
+  .news li:first-child{padding-top:7px}
+  .news li:last-child{border-bottom:none}
+  .news a{color:var(--ink);text-decoration:none;font-size:13px;line-height:1.5;font-weight:600}
+  .news a:hover{color:var(--asset)}
+  .news .sn{margin-top:4px;color:var(--ink-2);font:400 11.5px/1.6 var(--mono);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .news .tm{display:block;margin-top:6px;font:400 10.5px/1 var(--mono);color:var(--ink-2)}
+  .news .tm b{color:var(--asset);font-weight:600}
+  .macro{display:grid;align-content:start;gap:3px;padding:12px 18px 14px 20px;border-left:1px solid var(--border)}
+  @media(max-width:900px){.macro{border-left:none;border-top:1px solid var(--border);padding-top:12px}}
+  .mk{font:500 11px/1 var(--mono);letter-spacing:.1em;color:var(--ink-2);margin-bottom:4px}
+  .mr{display:grid;grid-template-columns:1fr auto;gap:1px 12px;align-items:center;padding:6px 0;border-bottom:1px dashed #1a2330}
+  .mr:last-child{border-bottom:none}
+  .mr .k{font-size:11.5px;color:var(--ink)}
+  .mr .k .s{display:block;font:400 10px/1.4 var(--mono);color:var(--ink-2);margin-top:2px}
+  .mr .v{font:600 12px/1 var(--mono);text-align:right;white-space:nowrap}
+
+  /* 链上数据:稳定币弹药 + BTC 手续费 */
+  .chainbox{display:grid;gap:0;padding:6px 18px 14px}
+  .st-num{font:600 27px/1 var(--mono);margin:6px 0 2px}
+  .st-deltas{font:400 11.5px/1 var(--mono);color:var(--ink-2);margin-bottom:12px}
+  .st-deltas b{font-family:var(--mono)}
+  .str{display:grid;grid-template-columns:44px 1fr auto auto;gap:9px;align-items:center;font-size:12px;padding:5px 0}
+  .str .sym{font:600 11px/1 var(--mono);color:var(--ink)}
+  .str .bar{height:5px;border-radius:3px;background:#1c2530;overflow:hidden}
+  .str .bar i{display:block;height:100%;background:var(--asset);border-radius:3px}
+  .str .amt{font:400 11px/1 var(--mono);color:var(--ink-2);white-space:nowrap}
+  .str .d{font:600 11px/1 var(--mono);min-width:56px;text-align:right;white-space:nowrap}
+  .mp{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font:400 11px/1.7 var(--mono);color:var(--ink-2)}
+  .mp b{font-family:var(--mono);color:var(--ink)}
+
+  /* 风险监控:规则清单 */
+  .risk{display:grid;gap:9px;padding:14px 18px}
+  .rk{display:grid;grid-template-columns:auto 1fr;gap:11px;padding:10px 12px;border:1px solid var(--border);border-radius:9px;background:#0e1520;align-items:start}
+  .rk .tag{font:700 10px/1 var(--mono);padding:5px 8px;border-radius:99px;letter-spacing:.05em}
+  .rk .nm{font:500 11px/1 var(--mono);color:var(--ink-2);letter-spacing:.03em;margin-bottom:5px}
+  .rk .vl{font:600 13px/1.3 var(--mono)}
+  .rk .ht{font:400 11px/1.6 var(--mono);color:var(--ink-2);margin-top:4px}
+</style>
+</head>
+<body>
+<header>
+  <h1>币圈</h1>
+  <a class="navlink" href="hub.html">← 门户</a>
+  <a class="navlink" href="stock.html">大A →</a>
+  <div class="pills"><button id="refresh">刷新</button></div>
+</header>
+<div class="status" id="status">加载数据中…</div>
+
+<main>
+  <section class="panel">
+    <div class="phead"><div class="eyebrow">现货与市值</div><h2>市场概览</h2></div>
+    <div class="src" id="src-market"></div>
+    <div class="ovrow">
+      <div class="ovleft">
+        <div id="spot"></div>
+        <div class="gsum" id="gsum"></div>
+      </div>
+      <div class="mcaps" id="mcaps"></div>
+    </div>
+  </section>
+
+  <div class="fundrow">
+    <section class="panel">
+      <div class="phead"><div class="eyebrow">恐慌贪婪指数 · 近30天</div><h2>恐慌贪婪指数</h2></div>
+      <div class="src" id="src-fng"></div>
+      <div id="fng" class="fng-chart"></div>
+      <div class="fng-now" id="fng-now"></div>
+    </section>
+    <section class="panel">
+      <div class="phead"><div class="eyebrow">永续资金费率 · 每8h结算</div><h2>资金费率走势(每所一线)</h2></div>
+      <div class="src" id="src-funding"></div>
+      <div class="fpills" id="funding-pills"></div>
+      <div id="funding" class="fchart"></div>
+      <div class="fnote" id="funding-note"></div>
+    </section>
+  </div>
+
+  <section class="panel">
+    <div class="phead"><div class="eyebrow">ETF 资金流</div><h2>BTC / ETH 现货 ETF 净流入</h2></div>
+    <div class="src" id="src-etf"></div>
+    <div class="etf-sum" id="etf-sum"></div>
+    <div class="etf-chart" id="etf-chart"></div>
+    <div class="etf-note" id="etf-note"></div>
+  </section>
+
+  <div class="fundrow">
+    <section class="panel">
+      <div class="phead"><div class="eyebrow">链上数据</div><h2>「聪明钱在干什么」</h2></div>
+      <div class="src" id="src-chain"></div>
+      <div class="chainbox" id="chain"></div>
+    </section>
+    <section class="panel">
+      <div class="phead"><div class="eyebrow">风险监控</div><h2>「现在有什么可能出事」</h2></div>
+      <div class="risk" id="risk"></div>
+      <div class="fnote">规则由本页已取数据实时判定(默认看 BTC 费率):永续费率极值、主流 24h 波幅、情绪极值、BTC 链上拥堵。绿=正常,黄=关注,红=风险信号,仅供参考不构成建议。</div>
+    </section>
+  </div>
+
+  <section class="panel">
+    <div class="phead"><div class="eyebrow">活动 / 机会</div><h2>交易所活动与机会</h2></div>
+    <div class="src" id="src-ann"></div>
+    <div class="ann" id="ann"></div>
+  </section>
+
+  <section class="panel">
+    <div class="phead"><div class="eyebrow">相关新闻 &amp; 宏观</div><h2>「为什么今天涨跌」</h2></div>
+    <div class="src" id="src-news"></div>
+    <div class="newsgrid">
+      <div class="news" id="news"></div>
+      <div class="macro"><div class="mk">今日宏观 · 资金驱动清单</div><div id="macro"></div></div>
+    </div>
+  </section>
+
+  <p class="foot">公开接口、免登录、服务端 30s 缓存。现货:BTC/ETH/SOL/BNB 走币安大陆镜像,OKB 走 OKX;市值与占比走 CoinGecko;恐慌贪婪来自 alternative.me;永续资金费率:BTC/ETH/BNB × 币安(fapi)/欧易/Bitget/Bybit,标记价与结算时间以各所为准,合约域大陆可能不可达,失败会标注而非白屏。活动/机会:BTC/ETH/SOL/BNB 之外的四个交易所(币安/欧易/Bybit/Bitget)各取 3 条,欧易/Bitget 原生中文,币安/Bybit 官方仅英文接口、标题由服务端转简体。ETF 资金流仅 BTC/ETH(现货 ETF;SOL/BNB/OKB 无 ETF),数据来自第三方免费源(延后 1 日),曲线自接入日起由本机逐日累积,仅供自用参考,非投资建议。相关新闻 &amp; 宏观:资讯来自 Cointelegraph RSS(免 key,标题服务端转简体,点开看英文原文),右侧宏观清单由本页上述接口现算;美股/美元指数/黄金等传统宏观在「免 key」限制下无稳定免费源,暂缺。链上:稳定币总供给来自 DefiLlama、BTC 实时手续费档来自 mempool.space——免 key 口径下「聪明钱」的可靠近似(交易所净流入、巨鲸地址追踪需付费源,此处不做假数)。风险监控为上述数据的规则判定,仅供参考。</p>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
+<script src="crypto.js"></script>
+</body>
+</html>

@@ -1,6 +1,6 @@
 import { Column, Entity, PrimaryGeneratedColumn } from "typeorm";
 
-@Entity("money", { schema: "ty_test" })
+@Entity("money", { schema: "tianhuiaccount" })
 export class Money {
   @PrimaryGeneratedColumn({ type: "bigint", name: "id" })
   id: string;
@@ -14,15 +14,18 @@ export class Money {
   @Column("int", { name: "inmoney", nullable: true, comment: "进账" })
   inmoney: number | null;
 
-  @Column("int", { name: "credit", nullable: true, comment: "信用卡消费" })
-  credit: number | null;
+  @Column("int", { name: "periodical", nullable: true, comment: "零钱" })
+  periodical: number | null;
 
   @Column("int", {
-    name: "outmoney_other",
+    name: "periodical_increase",
     nullable: true,
-    comment: "定向支出",
+    comment: "零钱增量",
   })
-  outmoneyOther: number | null;
+  periodicalIncrease: number | null;
+
+  @Column("int", { name: "credit", nullable: true, comment: "信用卡消费" })
+  credit: number | null;
 
   @Column("int", { name: "outmoney_rent", nullable: true, comment: "房租支出" })
   outmoneyRent: number | null;
@@ -41,44 +44,24 @@ export class Money {
   })
   outmoneySocialSecurity: number | null;
 
-  @Column("int", { name: "outmoney_cons", nullable: true, comment: "出帐" })
+  @Column("int", {
+    name: "outmoney_other",
+    nullable: true,
+    comment: "其他支出",
+  })
+  outmoneyOther: number | null;
+
+  @Column("int", { name: "outmoney_cons", nullable: true, comment: "总出帐" })
   outmoneyCons: number | null;
 
   @Column("int", { name: "outmoney_net", nullable: true, comment: "净支出" })
   outmoneyNet: number | null;
 
+  @Column("int", { name: "outmoney_life", nullable: true, comment: "生活开支" })
+  outmoneyLife: number | null;
+
   @Column("int", { name: "increment", nullable: true, comment: "增量" })
   increment: number | null;
-
-  @Column("int", { name: "periodical", nullable: true, comment: "存款" })
-  periodical: number | null;
-
-  @Column("int", { name: "fund", nullable: true, comment: "基金" })
-  fund: number | null;
-
-  @Column("int", { name: "fund_profit", nullable: true, comment: "fund盈亏" })
-  fundProfit: number | null;
-
-  @Column("int", { name: "bit_amount", nullable: true, comment: "币余" })
-  bitAmount: number | null;
-
-  @Column("int", { name: "bit_profit", nullable: true, comment: "bit盈亏" })
-  bitProfit: number | null;
-
-  @Column("int", { name: "stock_amount", nullable: true, comment: "股余" })
-  stockAmount: number | null;
-
-  @Column("int", { name: "stock_profit", nullable: true, comment: "stock盈亏" })
-  stockProfit: number | null;
-
-  @Column("int", { name: "zfb_amount", nullable: true, comment: "zfb" })
-  zfbAmount: number | null;
-
-  @Column("int", { name: "zfb_profit", nullable: true, comment: "zfb盈亏" })
-  zfbProfit: number | null;
-
-  @Column("int", { name: "sum_profit", nullable: true, comment: "总盈亏" })
-  sumProfit: number | null;
 
   @Column("int", { name: "money", nullable: true, comment: "余额" })
   money: number | null;

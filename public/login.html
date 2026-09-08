@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>登录</title>
+<link rel="stylesheet" href="theme.css">
+<style>
+  /* 页面私有样式;共用规格见 theme.css */
+  .box{max-width:380px;margin:8vh auto 0}
+  .box form{padding:22px;display:grid;gap:12px}
+  .box label{font:500 10px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--ink-2)}
+  .box input{width:100%;margin-top:6px;background:#0b0f15;border:1px solid var(--border);border-radius:6px;color:var(--ink);font:400 14px/1 var(--mono);padding:10px 12px}
+  .box input:focus{outline:none;border-color:#28476e}
+  .box button{margin-top:6px;font:600 13px/1 var(--mono);letter-spacing:.05em;color:var(--bg);background:var(--asset);border:none;border-radius:6px;padding:12px;cursor:pointer}
+  .box button:hover{background:#6ba1ff}
+  .msg{min-height:14px;font:400 12px/1.5 var(--mono);color:var(--down)}
+</style>
+</head>
+<body>
+<div class="box">
+  <div class="panel">
+    <div class="phead"><div class="eyebrow">Sign in</div><h2>登录</h2></div>
+    <form id="f" autocomplete="on">
+      <div><label for="u">账号</label><input id="u" name="username" autocomplete="username" required></div>
+      <div><label for="p">密码</label><input id="p" name="password" type="password" autocomplete="current-password" required></div>
+      <button type="submit">进入</button>
+      <div class="msg" id="msg"></div>
+    </form>
+  </div>
+  <p class="foot"><a class="navlink" href="hub.html">← 门户</a> 登录后将回到你要看的页面;大A与币圈板块无需登录。</p>
+</div>
+<script>
+  document.getElementById('f').onsubmit = async e => {
+    e.preventDefault();
+    const msg = document.getElementById('msg');
+    msg.textContent = '';
+    const r = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ username: u.value, password: p.value }),
+    }).catch(() => null);
+    const j = r && await r.json().catch(() => null);
+    if (j && j.success) {
+      location.href = new URLSearchParams(location.search).get('back') || 'hub.html';
+    } else {
+      msg.textContent = (j && j.message) || '登录失败,请重试';
+    }
+  };
+</script>
+</body>
+</html>

@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>股票持仓</title>
+<link rel="stylesheet" href="theme.css">
+<style>
+  /* 页面私有样式;共用规格见 theme.css */
+  .tscroll{overflow-x:auto}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{text-align:right;font:500 11px/1 var(--mono);letter-spacing:.05em;color:var(--ink-2);padding:11px 14px;border-bottom:1px solid var(--border);white-space:nowrap}
+  th:first-child,td:first-child{text-align:left}
+  td{padding:11px 14px;border-bottom:1px solid #151c26;text-align:right;white-space:nowrap;font-family:var(--mono);font-variant-numeric:tabular-nums}
+  tr:last-child td{border-bottom:none}
+  td.nm{text-align:left}
+  td.nm b{font-family:var(--sans);font-weight:600}
+  td.nm .cd{color:var(--ink-2);font-size:11.5px;margin-left:8px}
+  .mk{font-size:10.5px;letter-spacing:.05em;color:var(--ink-2);border:1px solid var(--border);border-radius:999px;padding:3px 8px;margin-left:8px}
+  .pos{color:var(--up)} .neg{color:var(--down)} .err{color:var(--down)} .na{color:var(--ink-2)}
+</style>
+</head>
+<body>
+<header>
+  <h1>股票持仓</h1>
+  <a class="navlink" href="hub.html">← 门户</a>
+  <div class="pills"><button id="refresh">刷新</button></div>
+</header>
+<div class="status" id="status">加载持仓行情中…</div>
+
+<section class="panel">
+  <div class="phead"><div class="eyebrow">Holdings</div><h2>持仓总览</h2></div>
+  <div class="tscroll"><table id="tbl"></table></div>
+</section>
+
+<p class="foot">v1 框架:清单存 MySQL <code>holding</code> 表(增删直接改表),报价走腾讯免费行情(服务端 60s 缓存)。逐股新闻扫描、四类重点关注(超跌不坏/低位估值/改善未反映/逻辑风险)与飞书日报将在细化阶段接入(参考 holdings-recap + 妙想资讯)。</p>
+<script src="holdings.js"></script>
+</body>
+</html>

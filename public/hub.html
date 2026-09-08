@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>财富门户</title>
+<link rel="stylesheet" href="theme.css">
+<style>
+  /* 页面私有样式;共用规格见 theme.css */
+  main{display:grid;gap:14px;grid-template-columns:repeat(2,1fr)}
+  @media(max-width:760px){main{grid-template-columns:1fr}}
+  a.card{display:block;text-decoration:none;color:inherit;padding:22px 24px;position:relative;transition:border-color .15s}
+  a.card:hover{border-color:#28476e}
+  a.card:focus-visible{outline:2px solid var(--asset);outline-offset:2px}
+  .card .eyebrow{margin-bottom:8px}
+  .card h2{font-size:19px;font-weight:600;letter-spacing:.02em}
+  .card p{margin-top:9px;font-size:13px;line-height:1.7;color:var(--ink-2)}
+  .tag{position:absolute;top:20px;right:22px;font:500 10.5px/1 var(--mono);letter-spacing:.08em;color:var(--ink-2);border:1px solid var(--border);border-radius:999px;padding:5px 10px}
+  .tag.lock{color:#e0b458;border-color:#4a3c1e}
+  .sub{margin-top:14px;font:500 12px/1 var(--mono);color:var(--asset)}
+  .who{margin-left:auto;display:flex;align-items:center;gap:10px;font:400 12px/1 var(--mono);color:var(--ink-2)}
+</style>
+</head>
+<body>
+<header>
+  <h1>财富门户</h1>
+  <div class="who" id="who">…</div>
+</header>
+<div class="status">四个板块 · 个人财务与持仓需登录 · 大A与币圈公开可看</div>
+
+<main>
+  <a class="panel card" href="dashboard.html">
+    <span class="tag lock">登录</span>
+    <div class="eyebrow">Personal Finance</div>
+    <h2>我的财富</h2>
+    <p>总资产、钱在哪里、财富趋势、每期变化与收支现金流</p>
+    <div class="sub">账本快照 →</div>
+  </a>
+  <a class="panel card" href="cashflow.html">
+    <span class="tag lock">登录</span>
+    <div class="eyebrow">Cashflow Ledger</div>
+    <h2>资金流水</h2>
+    <p>按月看进账、显性支出与当月流水明细</p>
+    <div class="sub">逐月对账 →</div>
+  </a>
+  <a class="panel card" href="stock.html">
+    <span class="tag">公开</span>
+    <div class="eyebrow">A-Share Radar</div>
+    <h2>大A股票</h2>
+    <p>指数与涨跌家数 → 板块资金 → 今日机会(启发式 Top6)→ 涨停池与异动 → 重要资讯,免费现源</p>
+    <div class="sub">六层看盘 →</div>
+  </a>
+  <a class="panel card" href="crypto.html">
+    <span class="tag">公开</span>
+    <div class="eyebrow">Crypto Radar</div>
+    <h2>币圈</h2>
+    <p>市场概览 → 恐慌贪婪与资金费率 → BTC/ETH ETF 资金流 → 链上与风险监控 → 活动与相关新闻,免费现源</p>
+    <div class="sub">深度研究 →</div>
+  </a>
+  <a class="panel card" href="holdings.html">
+    <span class="tag lock">登录</span>
+    <div class="eyebrow">Holdings Recap</div>
+    <h2>股票持仓</h2>
+    <p>我的 11 只持仓清单与实时报价(A股 + 港股)</p>
+    <div class="sub">持仓 →</div>
+  </a>
+</main>
+
+<p class="foot">v1 框架版:各板块先打通数据与页面骨架,后续逐板块细化。个人财务板块另有「我的财富 ⇄ 资金流水」互链。</p>
+<script>
+  fetch('/api/me').then(r => r.json()).then(j => {
+    const u = j?.data?.user;
+    document.getElementById('who').innerHTML = u
+      ? `已登录:${u.username} · <a class="navlink" href="#" id="logout">退出</a>`
+      : `<a class="navlink" href="login.html?back=hub.html">登录</a> 后可看个人财务与持仓`;
+    const lo = document.getElementById('logout');
+    if (lo) lo.onclick = async e => { e.preventDefault(); await fetch('/api/logout', { method: 'POST' }); location.reload(); };
+  }).catch(() => { document.getElementById('who').textContent = ''; });
+</script>
+</body>
+</html>

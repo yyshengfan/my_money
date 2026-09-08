@@ -3,16 +3,19 @@ import * as koa from '@midwayjs/koa';
 import * as validate from '@midwayjs/validate';
 import * as info from '@midwayjs/info';
 import { join } from 'path';
-// import { DefaultErrorFilter } from './filter/default.filter';
-// import { NotFoundFilter } from './filter/notfound.filter';
 import { ReportMiddleware } from './middleware/report.middleware';
+import { AuthMiddleware } from './middleware/auth.middleware';
 import * as orm from '@midwayjs/typeorm';
+import * as staticFile from '@midwayjs/static-file';
+import * as session from '@midwayjs/session';
 
 @Configuration({
   imports: [
     orm,
     koa,
     validate,
+    staticFile,
+    session,
     {
       component: info,
       enabledEnvironment: ['local'],
@@ -26,8 +29,6 @@ export class MainConfiguration {
 
   async onReady() {
     // add middleware
-    this.app.useMiddleware([ReportMiddleware]);
-    // add filter
-    // this.app.useFilter([NotFoundFilter, DefaultErrorFilter]);
+    this.app.useMiddleware([ReportMiddleware, AuthMiddleware]);
   }
 }

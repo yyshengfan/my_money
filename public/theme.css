@@ -1,0 +1,39 @@
+/* 两页共用的视觉规格:我的财富(dashboard)⇄ 资金流水(cashflow)
+   画布、令牌、顶栏、面板头、pill 控件都收在这里,页面私有样式留在各自 HTML 内联 */
+:root {
+  --bg:#0a0d12; --panel:#10151c; --border:#1c2530;
+  --ink:#e6edf3; --ink-2:#8b98a5;
+  --asset:#4f8cff; --up:#58d68d; --down:#ff6b6b; --neutral:#cbd5e1;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --sans:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+}
+*{box-sizing:border-box;margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;padding:20px 24px 40px;max-width:1440px;margin:0 auto}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+/* 顶栏 */
+header{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-bottom:4px}
+h1{font-size:17px;font-weight:600;letter-spacing:.02em}
+.status{font:400 12px/1 var(--mono);color:var(--ink-2);margin-bottom:14px}
+.navlink{font:500 12px/1 var(--mono);color:var(--ink-2);text-decoration:none;border:1px solid var(--border);border-radius:999px;padding:7px 12px}
+.navlink:hover{color:var(--asset);border-color:#28476e}
+.navlink:focus-visible{outline:2px solid var(--asset);outline-offset:2px}
+
+/* pill 控件组(时间窗/粒度/月份翻页共用) */
+.pills{display:flex;margin-left:auto;gap:10px;flex-wrap:wrap}
+.pills+.pills{margin-left:0}
+.pills button{font:500 12px/1 var(--mono);color:var(--ink-2);background:transparent;border:1px solid var(--border);padding:7px 12px;cursor:pointer;letter-spacing:.05em}
+.pills button:first-child{border-radius:999px 0 0 999px}
+.pills button:last-child{border-radius:0 999px 999px 0}
+.pills button+button{border-left:none}
+.pills button.on{color:var(--asset);border-color:#28476e;box-shadow:inset 0 0 12px #101f33,0 0 6px #0e1b2e}
+.pills button:focus-visible{outline:2px solid var(--asset);outline-offset:2px}
+
+/* 面板 */
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.phead{padding:16px 18px 0}
+.eyebrow{font:500 10px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--ink-2)}
+.phead h2{font-size:15px;font-weight:600;margin-top:7px;letter-spacing:.02em}
+.foot{margin-top:16px;font-size:12px;color:var(--ink-2);line-height:1.7}
+
+@media(prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
