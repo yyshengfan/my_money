@@ -9,17 +9,6 @@
   /* 首页私有样式(令牌见 theme.css)。总览页为跨市场雷达:统一配色便于一眼对比。
      A股小列/币圈小列仍各按本市场习惯着色,戳进对应雷达页颜色一致。 */
   body{max-width:1240px}
-  header{gap:14px}
-  .brand{display:flex;align-items:center;gap:9px}
-  .brand .dot{width:9px;height:9px;border-radius:50%;background:var(--up);box-shadow:0 0 10px var(--up);animation:blink 2.4s ease-in-out infinite}
-  h1{font-size:16px;letter-spacing:.06em}
-  @keyframes blink{0%,100%{opacity:1}50%{opacity:.35}}
-  nav{display:flex;gap:2px;flex-wrap:wrap}
-  nav a{font:500 12px/1 var(--mono);color:var(--ink-2);text-decoration:none;padding:8px 11px;border-radius:8px;letter-spacing:.02em}
-  nav a:hover{color:var(--ink);background:#111923}
-  nav a.on{color:#7fd7ff;background:#0e1c2b}
-  nav .lk{font-size:9px;opacity:.7;vertical-align:1px}
-  .who{margin-left:auto;display:flex;align-items:center;gap:10px;font:400 12px/1 var(--mono);color:var(--ink-2)}
   main{display:grid;gap:14px}
   .mktrow{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:stretch}
   @media(max-width:900px){.mktrow{grid-template-columns:1fr}}
@@ -92,14 +81,14 @@
 <header>
   <div class="brand"><span class="dot"></span><h1>投资雷达</h1></div>
   <nav>
-    <a class="on" href="hub.html">总览</a>
+    <a href="hub.html">总览</a>
     <a href="stock.html">A股</a>
     <a href="crypto.html">币圈</a>
     <a href="dashboard.html">我的财富<span class="lk">🔒</span></a>
     <a href="cashflow.html">流水<span class="lk">🔒</span></a>
     <a href="holdings.html">持仓<span class="lk">🔒</span></a>
   </nav>
-  <div class="who" id="who">…</div>
+  <div class="who" id="who"></div>
 </header>
 <div class="status" id="status">加载中…</div>
 
@@ -161,6 +150,7 @@
 
   <p class="foot" id="footnote"></p>
 </main>
+<script src="nav.js"></script>
 <script src="hub.js"></script>
 </body>
 </html>

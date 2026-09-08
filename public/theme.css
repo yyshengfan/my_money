@@ -1,5 +1,5 @@
-/* 两页共用的视觉规格:我的财富(dashboard)⇄ 资金流水(cashflow)
-   画布、令牌、顶栏、面板头、pill 控件都收在这里,页面私有样式留在各自 HTML 内联 */
+/* 全站共用的视觉规格:我的财富(dashboard)、资金流水(cashflow)、投资雷达(hub)及各雷达页。
+   画布、令牌、顶栏骨架、面板头、pill 控件都收在这里,页面私有样式留在各自 HTML 内联 */
 :root {
   --bg:#0a0d12; --panel:#10151c; --border:#1c2530;
   --ink:#e6edf3; --ink-2:#8b98a5;
@@ -11,20 +11,30 @@
 body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;padding:20px 24px 40px;max-width:1440px;margin:0 auto}
 .num{font-family:var(--mono);font-variant-numeric:tabular-nums}
 
-/* 顶栏 */
-header{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-bottom:4px}
-h1{font-size:17px;font-weight:600;letter-spacing:.02em}
+/* 顶栏骨架(全站统一:brand 光点标题 / nav 六链接 / 右侧控件 / #who 登录态)
+   nav{margin-right:auto} 把控件与 #who 整体推到最右;每页 HTML 内联相同骨架,nav.js 负责标 .on 与渲染 #who */
+header{display:flex;flex-wrap:wrap;align-items:center;column-gap:20px;row-gap:10px;margin-bottom:6px}
+.brand{display:flex;align-items:center;gap:10px}
+.brand .dot{width:10px;height:10px;border-radius:50%;background:var(--up);box-shadow:0 0 12px var(--up);animation:blink 2.4s ease-in-out infinite;flex:none}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.35}}
+header h1{font-size:19px;font-weight:700;letter-spacing:.06em;white-space:nowrap}
+nav{display:flex;align-items:center;gap:2px;flex-wrap:wrap;margin-right:auto}
+nav a{font:500 12.5px/1 var(--mono);color:var(--ink-2);text-decoration:none;padding:8px 12px;border-radius:8px;letter-spacing:.03em}
+nav a:hover{color:var(--ink);background:#121a26}
+nav a.on{color:#eaf6ff;background:linear-gradient(180deg,#153655,#0d2036);box-shadow:inset 0 0 0 1px #21507e,0 0 14px rgba(79,140,255,.26)}
+nav .lk{font-size:9px;opacity:.85;vertical-align:2px}
+.who{display:flex;align-items:center;gap:8px;font:400 12px/1 var(--mono);color:var(--ink-2);white-space:nowrap}
 .status{font:400 12px/1 var(--mono);color:var(--ink-2);margin-bottom:14px}
-.navlink{font:500 12px/1 var(--mono);color:var(--ink-2);text-decoration:none;border:1px solid var(--border);border-radius:999px;padding:7px 12px}
+.navlink{font:500 12px/1 var(--mono);color:var(--ink-2);text-decoration:none;border:1px solid var(--border);border-radius:999px;padding:6px 12px}
 .navlink:hover{color:var(--asset);border-color:#28476e}
 .navlink:focus-visible{outline:2px solid var(--asset);outline-offset:2px}
 
-/* pill 控件组(时间窗/粒度/月份翻页共用) */
-.pills{display:flex;margin-left:auto;gap:10px;flex-wrap:wrap}
-.pills+.pills{margin-left:0}
+/* pill 控件组(时间窗/粒度/刷新/月份翻页共用)。靠右由 nav 的 auto 完成,不再自设 margin-left:auto */
+.pills{display:flex;gap:10px;flex-wrap:wrap}
 .pills button{font:500 12px/1 var(--mono);color:var(--ink-2);background:transparent;border:1px solid var(--border);padding:7px 12px;cursor:pointer;letter-spacing:.05em}
 .pills button:first-child{border-radius:999px 0 0 999px}
 .pills button:last-child{border-radius:0 999px 999px 0}
+.pills button:only-child{border-radius:999px}
 .pills button+button{border-left:none}
 .pills button.on{color:var(--asset);border-color:#28476e;box-shadow:inset 0 0 12px #101f33,0 0 6px #0e1b2e}
 .pills button:focus-visible{outline:2px solid var(--asset);outline-offset:2px}

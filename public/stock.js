@@ -221,17 +221,27 @@ if (typeof window !== 'undefined') {
   }
 
   // ③ 今日机会(评分 Top6)
-  function renderOpp(o) {
+  // ③ 今日机会:东财优先,不可用时妙想 MX 兜底(MX 行已由服务端转成同形状 {cands,down,vol,partial})
+  function renderOpp(o, mx) {
     const el = document.getElementById('opps');
-    document.getElementById('src-opp').innerHTML = srcBadges({ '东财全A': o });
-    if (!o || !o.ok) { el.innerHTML = '<div class="err">✗ 全A行情不可用(评分需涨跌/资金/换手/估值,东财限流时刷新重试)</div>'; return; }
-    const rows = o.data.cands || [];
+    const badges = { '东财全A': o };
+    if (mx) badges['妙想MX'] = mx;
+    document.getElementById('src-opp').innerHTML = srcBadges(badges);
+    const useMx = mx && mx.ok && !(o && o.ok);
+    const act = useMx ? mx : o;
+    if (!act || !act.ok) { el.innerHTML = '<div class="err">✗ 全A行情与妙想兜底均不可用(评分需涨跌/资金/换手/估值,东财限流时稍后刷新重试)</div>'; return; }
+    const rows = act.data.cands || [];
     const ranked = rows
       .map(r => ({ r, s: oppScore(r, indPct) }))
       .filter(x => x.s)
       .sort((a, b) => b.s.score - a.s.score || (b.s.pct || 0) - (a.s.pct || 0))
       .slice(0, 6);
-    if (!ranked.length) { el.innerHTML = '<div class="err">今日无符合启发式的标的(可能全A行情未就绪)</div>'; return; }
+    if (!ranked.length) {
+      el.innerHTML = useMx
+        ? '<div class="err">妙想 MX 兜底未返回符合启发式的标的(其结果为语义选股,字段可能不全)</div>'
+        : '<div class="err">今日无符合启发式的标的(可能全A行情未就绪)</div>';
+      return;
+    }
     el.innerHTML = ranked.map(({ r, s }, i) => `
       <div class="opp">
         <div class="sc ${s.score >= 65 ? 'hi' : s.score >= 45 ? 'mid' : ''}">${s.score}</div>
@@ -241,8 +251,9 @@ if (typeof window !== 'undefined') {
         <div class="why">${esc(s.reason)}<span class="xi">${esc(s.ind || '')}</span></div>
       </div>`).join('');
     document.getElementById('opp-note').textContent =
+      (useMx ? '东财不可用,当前为妙想 MX 兜底(字段可能不全)。' : '') +
       `评分=主力流入30+走势25+量价健康20+估值15(启发式,满 100)。剔除涨停(pct≥9.8)与过热项。` +
-      `仅用东财日频免费口径(主力/换手/量比/PE/PB),无北向、无逐笔,非投资建议。`;
+      `仅用免费口径(主力/换手/量比/PE/PB),无北向、无逐笔,非投资建议。`;
   }
 
   // ④ 市场资金:涨停池主力聚焦 | 板块净流入/流出 | 连板聚焦
@@ -276,23 +287,32 @@ if (typeof window !== 'undefined') {
       `免费口径没有全市场超大单/大单细分,北向资金官方已停发 —— 此处不做假数。${poolRes.data.date} 涨停池共 ${rows.length} 只。`;
   }
 
-  // ⑤ 重要资讯
-  function renderNews(nw) {
+  // ⑤ 重要资讯:东财优先,不可用时妙想 MX 兜底(均为中文,标题已贴标)
+  function renderNews(nw, mx) {
     const el = document.getElementById('news');
-    document.getElementById('src-news').innerHTML = srcBadges({ '东财资讯': nw });
-    if (!nw || !nw.ok) { el.innerHTML = '<div class="err">✗ 资讯不可用</div>'; return; }
+    const badges = { '东财资讯': nw };
+    if (mx) badges['妙想MX'] = mx;
+    document.getElementById('src-news').innerHTML = srcBadges(badges);
+    const useMx = mx && mx.ok && !(nw && nw.ok);
+    const act = useMx ? mx : nw;
+    if (!act || !act.ok) { el.innerHTML = '<div class="err">✗ 资讯与妙想兜底均不可用</div>'; return; }
     const tc = { 政策: 'tc-policy', 市场: 'tc-market', 公司: 'tc-company', 要闻: 'tc-news' };
-    el.innerHTML = (nw.data || []).map(x => `
+    el.innerHTML = (useMx ? `<div class="blk-note">东财不可用,当前为妙想 MX 兜底。</div>` : '') +
+      (act.data || []).map(x => `
       <div class="nrow">
-        <a class="t" href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.title)}</a>
+        ${x.url ? `<a class="t" href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.title)}</a>`
+          : `<span class="t">${esc(x.title)}</span>`}
         ${x.summary ? `<div class="s">${esc(x.summary)}</div>` : ''}
         <div class="m"><span class="tchip ${tc[x.tag] || 'tc-news'}">${x.tag || '要闻'}</span><span>${esc(x.media || '')}</span><span style="margin-left:auto">${esc(String(x.time || '').slice(0, 16))}</span></div>
       </div>`).join('');
   }
 
-  // ⑥ 市场异动:涨停连板(池) + 大跌 + 放量(机会全A列表附带的跌/量比榜)
-  function renderMoves(oppRes, poolRes) {
-    document.getElementById('src-moves').innerHTML = srcBadges({ '东财全A': oppRes, '东财涨停池': poolRes });
+  // ⑥ 市场异动:涨停连板(池) + 大跌 + 放量(机会列表附带的跌/量比榜;MX 兜底无跌量榜 → 诚实留空)
+  function renderMoves(em, mx, poolRes) {
+    const badges = { '东财全A': em, '东财涨停池': poolRes };
+    if (mx) badges['妙想MX'] = mx;
+    document.getElementById('src-moves').innerHTML = srcBadges(badges);
+    const oppRes = (em && em.ok) ? em : (mx && mx.ok) ? mx : null;
     const cols = [];
     const poolRows = (poolRes && poolRes.ok && poolRes.data.rows) || [];
     const zt = [...poolRows].filter(r => (+r.lb || 0) >= 2)
@@ -303,11 +323,11 @@ if (typeof window !== 'undefined') {
     const down = ((oppRes && oppRes.ok && oppRes.data.down) || []).slice(0, 6);
     cols.push(`<div class="colh">跌幅榜</div>` +
       (down.length ? down.map(r => `<div class="minir"><div class="r"><span class="n">${esc(r.name)}</span><span class="num ${aCls(r.pct)}">${p2(r.pct) == null ? '—' : (r.pct > 0 ? '+' : '') + (+r.pct).toFixed(2) + '%'}</span></div></div>`).join('')
-        : '<div class="blk-note">全A跌幅榜暂未返回</div>'));
+        : '<div class="blk-note">跌幅榜需东财全A列表(限流时无兜底)</div>'));
     const vol = ((oppRes && oppRes.ok && oppRes.data.vol) || []).slice(0, 6);
     cols.push(`<div class="colh">量比榜(放量)</div>` +
       (vol.length ? vol.map(r => `<div class="minir"><div class="r"><span class="n">${esc(r.name)}</span><span class="num">量比 ${p2(r.volRatio) == null ? '—' : (+r.volRatio).toFixed(1)}</span><span class="num ${aCls(r.pct)}">${p2(r.pct) == null ? '' : (r.pct > 0 ? '+' : '') + (+r.pct).toFixed(1) + '%'}</span></div></div>`).join('')
-        : '<div class="blk-note">量比榜暂未返回</div>'));
+        : '<div class="blk-note">量比榜需东财全A列表(限流时无兜底)</div>'));
     mv.innerHTML = cols.join('');
   }
 
@@ -323,13 +343,16 @@ if (typeof window !== 'undefined') {
     renderMarket((jm && jm.data) || {});
     const poolRes = (jf && jf.data && jf.data.pool) || { ok: false, error: '接口不可达' };
     renderFlow(poolRes);
-    renderNews((jn && jn.data && jn.data.em) || { ok: false, error: '接口不可达' });
+    const newsD = (jn && jn.data) || {};
+    renderNews(newsD.em || { ok: false, error: '接口不可达' }, newsD.mx || null);
     // 第二批:东财 clist 系(板块/机会)后台等;限流时先画上面,这里好了再补 ②③④板块列 ⑥
     const [jb, jo] = await Promise.all([
       get('/api/stock/boards'), get('/api/stock/opportunity'),
     ]);
     const boardsRes = (jb && jb.data && jb.data.em) || { ok: false, error: '接口不可达' };
-    const oppRes = (jo && jo.data && jo.data.em) || { ok: false, error: '接口不可达' };
+    const oppD = (jo && jo.data) || {};
+    const oppEm = oppD.em || { ok: false, error: '接口不可达' };
+    const oppMx = oppD.mx || null;
     document.getElementById('src-boards').innerHTML = srcBadges({ '东财板块': boardsRes });
     boardFail = !boardsRes.ok;
     boardRows = (boardsRes.ok && boardsRes.data) || [];
@@ -337,8 +360,8 @@ if (typeof window !== 'undefined') {
     renderBoardPills();
     renderBoards();
     renderFlow(poolRes); // 补上板块净流入/流出列(含失败红注)
-    renderOpp(oppRes);
-    renderMoves(oppRes, poolRes);
+    renderOpp(oppEm, oppMx);
+    renderMoves(oppEm, oppMx, poolRes);
 
     const qtRows = ((jm && jm.data && jm.data.qt) && jm.data.qt.ok && jm.data.qt.data) || [];
     const asOf = qtRows.map(r => r.time).find(t => t);

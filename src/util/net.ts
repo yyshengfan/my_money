@@ -72,6 +72,21 @@ export async function getBuffer(
   return request(url, ms, headers);
 }
 
+// POST JSON(妙想 MX 网关等用)。apikey 等鉴权放 headers;失败直接抛,不缓存。
+export async function postJson(
+  url: string,
+  body: any,
+  ms = 20000,
+  headers: Record<string, string> = {}
+): Promise<any> {
+  ensureProxyEnv();
+  const res = await axios.post(url, body, {
+    timeout: ms,
+    headers: { 'user-agent': UA, 'Content-Type': 'application/json', ...headers },
+  });
+  return res.data;
+}
+
 const store = new Map<string, { v: any; t: number }>();
 
 export async function cached<T>(

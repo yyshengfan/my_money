@@ -67,15 +67,22 @@
 </head>
 <body>
 <header>
-  <h1>我的财富</h1>
-  <a class="navlink" href="hub.html">← 门户</a>
-  <a class="navlink" href="cashflow.html">资金流水 →</a>
+  <div class="brand"><span class="dot"></span><h1>我的财富</h1></div>
+  <nav>
+    <a href="hub.html">总览</a>
+    <a href="stock.html">A股</a>
+    <a href="crypto.html">币圈</a>
+    <a href="dashboard.html">我的财富<span class="lk">🔒</span></a>
+    <a href="cashflow.html">流水<span class="lk">🔒</span></a>
+    <a href="holdings.html">持仓<span class="lk">🔒</span></a>
+  </nav>
   <div class="pills" id="range" aria-label="时间范围" title="全局时间窗(月/季/半年/年图与排行榜共用)">
     <button data-r="3">3M</button><button data-r="6">6M</button><button data-r="12" class="on">1Y</button><button data-r="36">3Y</button><button data-r="0">ALL</button>
   </div>
   <div class="pills" id="gran" aria-label="统计粒度" title="图②③④的统计粒度(增量求和、金额取期末)">
     <button data-g="month" class="on">月</button><button data-g="quarter">季</button><button data-g="half">半年</button><button data-g="year">年</button>
   </div>
+  <div class="who" id="who"></div>
 </header>
 <div class="status" id="status">加载数据中…</div>
 
@@ -136,6 +143,7 @@
     <div class="chart" id="catdetail"></div>
   </section>
 </main>
+<script src="nav.js"></script>
 <script src="dashboard.js"></script>
 <script>loadAndRender();</script>
 </body>

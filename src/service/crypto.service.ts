@@ -15,6 +15,42 @@ function safe<T>(fn: () => Promise<T>) {
   );
 }
 
+// 同一语义的多基座(fetchBest):逐 URL 至多试 2 次,全败抛最后一次错误。
+// 币安现货 data-api.binance.vision(大陆镜像)更稳,挂了自动回退国际站 api.binance.com。
+async function fetchBest<T>(
+  urls: string[],
+  parse: (j: any) => T,
+  ms = 8000
+): Promise<T> {
+  let lastErr: unknown;
+  for (const url of urls) {
+    for (let i = 0; i < 2; i++) {
+      try {
+        return parse(await getJson(url, ms));
+      } catch (e) {
+        lastErr = e;
+      }
+    }
+  }
+  throw lastErr;
+}
+async function binance24h(sym: string) {
+  return fetchBest(
+    [
+      `https://data-api.binance.vision/api/v3/ticker/24hr?symbol=${sym}`,
+      `https://api.binance.com/api/v3/ticker/24hr?symbol=${sym}`,
+    ],
+    (r: any) => ({
+      sym: r.symbol.replace('USDT', ''),
+      price: +r.lastPrice,
+      chgPct: +r.priceChangePercent,
+      high: +r.highPrice,
+      low: +r.lowPrice,
+      quoteVol: +r.quoteVolume,
+    })
+  );
+}
+
 const USDT_PAIRS = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT'];
 const FUND_COINS = ['BTC', 'ETH', 'BNB']; // 资金费率对比的币种
 const DOM_IDS = ['bitcoin', 'ethereum', 'solana', 'binancecoin', 'okb'];
@@ -120,22 +156,11 @@ function htmlUnescape(s: string): string {
 export class CryptoService {
   async overview() {
     return cached('crypto:overview', 30_000, async () => {
-      const [binance, okx, fng, global, dom] = await Promise.all([
-        // 现货 24h × 4 币:Binance 官方大陆镜像,直连
+      const [binance, okx, fut, fng, global, dom] = await Promise.all([
+        // 现货 24h × 4 币:Binance 大陆镜像优先,挂了回退国际站(fetchBest)
         safe(async () => {
-          const rows = await Promise.all(
-            USDT_PAIRS.map(s =>
-              getJson(`https://data-api.binance.vision/api/v3/ticker/24hr?symbol=${s}`)
-            )
-          );
-          return rows.map(r => ({
-            sym: r.symbol.replace('USDT', ''),
-            price: +r.lastPrice,
-            chgPct: +r.priceChangePercent,
-            high: +r.highPrice,
-            low: +r.lowPrice,
-            quoteVol: +r.quoteVolume,
-          }));
+          const rows = await Promise.all(USDT_PAIRS.map(s => binance24h(s)));
+          return rows.map(r => ({ ...r }));
         }),
         // OKB 只在 OKX 交易;24h 涨跌用 (last-open24h)/open24h 现算。
         // OKX ticker 的 volCcy24h 才是报价币(USDT)成交额(实测 ≈1850万),vol24h 是 OKB 币数
@@ -155,6 +180,36 @@ export class CryptoService {
               quoteVol: +d.volCcy24h, // 与币安 quoteVolume 同为 USDT 成交额口径
             },
           ];
+        }),
+        // 合约资金面(BTC/ETH):当下资金费率 + 未平仓价值 + 多空账户比(hub 徽标用)。
+        // fapi 大陆要代理,失败单独 ✗,不影响现货;数据仅 payload,不进 spot 涨跌口径。
+        safe(async () => {
+          const coins = await Promise.all(
+            ['BTC', 'ETH'].map(async sym => {
+              const [pi, oi, ls] = await Promise.all([
+                getJson(`https://fapi.binance.com/fapi/v1/premiumIndex?symbol=${sym}USDT`, 6000),
+                getJson(
+                  `https://fapi.binance.com/fapi/v1/futures/data/openInterestHist?symbol=${sym}USDT&period=5m&limit=1`,
+                  6000
+                ),
+                getJson(
+                  `https://fapi.binance.com/fapi/v1/futures/data/globalLongShortAccountRatio?symbol=${sym}USDT&period=5m&limit=1`,
+                  6000
+                ),
+              ]);
+              const h = (oi || [])[0] || {};
+              const l = (ls || [])[0] || {};
+              return {
+                sym,
+                markPrice: pi && pi.markPrice != null ? +pi.markPrice : null,
+                fundingRate: pi && pi.lastFundingRate != null ? +pi.lastFundingRate : null,
+                oiUsd: h.sumOpenInterestValue != null ? +h.sumOpenInterestValue : null,
+                longShortRatio: l.longShortRatio != null ? +l.longShortRatio : null,
+              };
+            })
+          );
+          if (!coins.length) throw new Error('合约面数据为空');
+          return coins;
         }),
         // 恐慌贪婪指数(近 30 天,画折线)
         safe(async () => {
@@ -196,7 +251,7 @@ export class CryptoService {
           }).filter(Boolean);
         }),
       ]);
-      return { spot: { binance, okx }, fng, global, dom };
+      return { spot: { binance, okx }, fut: { binance: fut }, fng, global, dom };
     });
   }
 

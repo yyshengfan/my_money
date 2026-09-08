@@ -22,9 +22,17 @@
 </head>
 <body>
 <header>
-  <h1>股票持仓</h1>
-  <a class="navlink" href="hub.html">← 门户</a>
+  <div class="brand"><span class="dot"></span><h1>股票持仓</h1></div>
+  <nav>
+    <a href="hub.html">总览</a>
+    <a href="stock.html">A股</a>
+    <a href="crypto.html">币圈</a>
+    <a href="dashboard.html">我的财富<span class="lk">🔒</span></a>
+    <a href="cashflow.html">流水<span class="lk">🔒</span></a>
+    <a href="holdings.html">持仓<span class="lk">🔒</span></a>
+  </nav>
   <div class="pills"><button id="refresh">刷新</button></div>
+  <div class="who" id="who"></div>
 </header>
 <div class="status" id="status">加载持仓行情中…</div>
 
@@ -34,6 +42,7 @@
 </section>
 
 <p class="foot">v1 框架:清单存 MySQL <code>holding</code> 表(增删直接改表),报价走腾讯免费行情(服务端 60s 缓存)。逐股新闻扫描、四类重点关注(超跌不坏/低位估值/改善未反映/逻辑风险)与飞书日报将在细化阶段接入(参考 holdings-recap + 妙想资讯)。</p>
+<script src="nav.js"></script>
 <script src="holdings.js"></script>
 </body>
 </html>

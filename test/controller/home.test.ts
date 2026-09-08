@@ -11,8 +11,8 @@ describe('test/controller/home.test.ts', () => {
     const result = await createHttpRequest(app).get('/');
 
     // use expect by jest
-    expect(result.status).toBe(200);
-    expect(result.text).toBe('Hello Midwayjs!');
+    expect(result.status).toBe(302);
+    expect(result.headers.location).toBe('/public/hub.html');
 
     // close app
     await close(app);

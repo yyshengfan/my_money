@@ -30,17 +30,6 @@ export class AuthService {
 
   async login(username: string, password: string): Promise<string | null> {
     const u = await this.usersRepo.findOne({ where: { username } });
-    // TODO 临时诊断,查完删
-    this.ctx.logger.info(
-      'login-dbg',
-      JSON.stringify({
-        found: !!u,
-        hashPrefix: u ? String(u.passHash).slice(0, 8) : null,
-        hashLen: u ? String(u.passHash).length : null,
-        pwLen: password ? password.length : null,
-        ok: u ? verifyPassword(password, u.passHash) : null,
-      })
-    );
     if (!u || !verifyPassword(password, u.passHash)) return null;
     (this.ctx as any).session.user = { username };
     return username;

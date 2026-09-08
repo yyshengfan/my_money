@@ -252,29 +252,39 @@ if (typeof window !== 'undefined') {
         <span class="pv">${price}</span>
         <span class="ch ${cls}">${chg != null ? (up ? '▲' : '▼') + ' ' + sp(chg) + chg.toFixed(2) + '%' : '—'}</span></div>`;
     }).join('');
-    // strip:总市值 / 市值24h / 恐慌贪婪
+    // strip:总市值 / 市值24h / 恐慌贪婪 / 资金费率+多空比(fut 徽标,BTC)
     const g = (ov.global && ov.global.ok && ov.global.data) || null;
     const fngArr = (ov.fng && ov.fng.ok && ov.fng.data) || [];
     const fng = fngArr.length ? pN(fngArr[fngArr.length - 1].value) : null;
+    const fut = (ov.fut && ov.fut.binance && ov.fut.binance.ok && ov.fut.binance.data) || [];
+    const bt = fut.find(x => x && x.sym === 'BTC') || {};
+    const fr = pN(bt.fundingRate), lsr = pN(bt.longShortRatio);
+    const frTxt = fr != null ? `${(fr * 100).toFixed(3)}%` : '—';
     const sb = (k, v, cls = '') => `<div class="sb"><span class="k">${k}</span><span class="v ${cls}">${v}</span></div>`;
     $('crypto-strip').innerHTML =
       sb('总市值', g && g.totalUsd != null ? fmtUsdShort(g.totalUsd) : '—') +
       sb('市值 24h', g && pN(g.mcapChgPct) != null ? `${sp(pN(g.mcapChgPct))}${pN(g.mcapChgPct).toFixed(1)}%` : '—', (g && pN(g.mcapChgPct) >= 0) ? 'cup' : (g ? 'cdn' : '')) +
-      sb('恐慌贪婪', fng != null ? `${Math.round(fng)} ${fngLabel(fng)}` : '—', fng != null ? `style=color:${fngColor(fng)}` : '');
+      sb('恐慌贪婪', fng != null ? `${Math.round(fng)} ${fngLabel(fng)}` : '—', fng != null ? `style=color:${fngColor(fng)}` : '') +
+      sb('BTC 资金费率', frTxt, fr != null ? (fr >= 0 ? 'cup' : 'cdn') : '') +
+      sb('BTC 多空比', lsr != null ? lsr.toFixed(2) : '—', lsr != null ? (lsr >= 1 ? 'cup' : 'cdn') : '');
   }
 
   function renderOppA(jo) {
     const el = $('oppA');
     const em = (jo && jo.data && jo.data.em) || { ok: false, error: '接口不可达' };
-    if (!em.ok) { el.innerHTML = `<div class="opprow"><span class="nm dim">✗ A股全A行情暂不可用(东财限流,雷达页会自动恢复)</span></div>`; return; }
-    const ranked = (em.data.cands || []).map(r => ({ r, s: oppScore(r, undefined) }))
+    const mx = (jo && jo.data && jo.data.mx) || null;
+    const useMx = !(em && em.ok) && mx && mx.ok; // 东财限流 → 妙想 MX 兜底
+    const cands = (em && em.ok) ? (em.data.cands || []) : useMx ? (mx.data.cands || []) : null;
+    if (cands === null) { el.innerHTML = `<div class="opprow"><span class="nm dim">✗ A股全A行情暂不可用(东财限流,妙想兜底亦未就绪,稍后自动恢复)</span></div>`; return; }
+    const ranked = cands.map(r => ({ r, s: oppScore(r, undefined) }))
       .filter(x => x.s).sort((a, b) => b.s.score - a.s.score || (b.s.pct || 0) - (a.s.pct || 0)).slice(0, 3);
+    const hint = useMx ? `<div class="opprow"><span class="nm dim">东财不可用,当前为妙想 MX 兜底(字段可能不全)。</span></div>` : '';
     if (!ranked.length) {
-      const n = (em.data.cands || []).length;
-      el.innerHTML = `<div class="opprow"><span class="nm dim">${n ? '今日涨幅榜均属涨停/过热,启发式无候选(涨停已剔除,避免追高)' : '暂无符合启发式的标的(可能非交易时段)'}</span></div>`;
+      const n = cands.length;
+      el.innerHTML = hint + `<div class="opprow"><span class="nm dim">${n ? '候选均属涨停/过热或无资金,启发式无可用(涨停已剔除,避免追高)' : useMx ? '妙想兜底未返回可用候选' : '暂无符合启发式的标的(可能非交易时段)'}</span></div>`;
       return;
     }
-    el.innerHTML = ranked.map(({ r, s }, i) => {
+    el.innerHTML = hint + ranked.map(({ r, s }, i) => {
       const p = s.pct, up = p >= 0, cls = up ? 'rna' : 'gna';
       return `<div class="opprow"><span class="rk">${String(i + 1).padStart(2, '0')}</span>
         <div><span class="nm">${esc(r.name)}<span class="sc ${s.score >= 65 ? 'hi' : ''}">${s.score}</span></span>
@@ -307,19 +317,12 @@ if (typeof window !== 'undefined') {
       ${s.val ? `<div class="val ${s.vcls || ''}">${esc(s.val)}</div>` : ''}</div>`).join('');
   }
 
-  function renderWho(u) {
-    $('who').innerHTML = u
-      ? `已登录:${esc(u.username)} · <a class="navlink" href="#" id="logout">退出</a>`
-      : `<a class="navlink" href="login.html?back=hub.html">登录</a>`;
-    const lo = $('logout');
-    if (lo) lo.onclick = async e => { e.preventDefault(); await fetch('/api/logout', { method: 'POST' }); location.reload(); };
-  }
-
   function loadAndRender() {
     const get = u => fetch(u).then(r => r.json()).catch(() => null);
+    // #who 登录态由公共 nav.js 渲染,这里只拉行情
     Promise.all([
-      get('/api/stock/market'), get('/api/stock/opportunity'), get('/api/crypto/overview'), get('/api/me'),
-    ]).then(([jm, jo, jc, jme]) => {
+      get('/api/stock/market'), get('/api/stock/opportunity'), get('/api/crypto/overview'),
+    ]).then(([jm, jo, jc]) => {
       const d = (jm && jm.data) || {};
       d.crypto = (jc && jc.data) || {};
       const { qmap, temp } = renderPulse(d);
@@ -334,7 +337,6 @@ if (typeof window !== 'undefined') {
       renderSignals(buildSignals({ qmap: qq, temp, limit: d.limit, breadth: d.breadth, ov, moversTop: movers(spot, okx, dom) }));
       renderOppA(jo);
       renderOppC(ov);
-      renderWho(jme && jme.data ? jme.data.user : null);
       const asOf = qs.map(r => r.time).find(t => t);
       $('status').textContent = `免费源 · A股缓存60s / 币圈30s · 行情时间 ${fmtQuoteTime(asOf) || '—'} · 刷新于 ${new Date().toLocaleTimeString('zh-CN')} · A股红涨绿跌 / 币圈绿涨红跌`;
     }).catch(() => { $('status').textContent = '部分数据源暂不可用,点击页内刷新可重试'; });

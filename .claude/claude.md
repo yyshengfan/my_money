@@ -27,7 +27,6 @@ npm start          # 生产启动(bootstrap.js)
 - `src/entity/entities/` — typeorm-model-generator 生成的实体
 - `src/config/config.default.ts` — 端口 7001 + typeorm 数据源 `datasource1`
 - `src/middleware/report.middleware.ts` — 在 `configuration.ts` 的 onReady 注册
-- `src/filter/` — 异常过滤器,当前已注释未启用
 
 ## 核心业务逻辑(createNew)
 
@@ -48,7 +47,7 @@ npm start          # 生产启动(bootstrap.js)
 
 ## 实体说明
 
-只有 `Money`(收支)和 `MoneyFinance`(理财快照)注册在 `config.default.ts` 的 `entities` 数组里、可被注入。其余生成的实体(Ceshi、Marry、Users、MobileCode、ServerNum、Zhuangxiu 等)未注册、未使用。
+注册在 `config.default.ts` 的 `entities` 数组里、可被注入的共 4 个:`Money`(收支)、`MoneyFinance`(理财快照)、`Users`(登录)、`Holding`(持仓)。其余生成的实体(Ceshi、Marry、MobileCode、ServerNum、Zhuangxiu 等)未注册、未使用。
 
 **新增实体三步**:① 在 `config.default.ts` import 并加入 `entities` 数组;② service 中 `@InjectEntityModel(X, 'datasource1')`(第二个参数数据源名必须写);③ 数据库表自己建,`synchronize: false`,ORM 不会同步表结构。
 
@@ -76,18 +75,20 @@ npm start          # 生产启动(bootstrap.js)
 
 ## 四板块扩展 v1(2026-09)
 
-**首页 `public/hub.html`+`public/hub.js`(2026-09 改为"投资雷达",不再是卡片门户)**:公开页,复用 theme.css 深色规格。顶栏链到 A股/币圈/我的财富🔒(dashboard)/流水🔒(cashflow)/持仓🔒(holdings)。四区:① MARKET PULSE(一句话氛围 + 两个 conic-gradient 圆环仪表:A股温度 / 币圈恐慌贪婪)② 双列行情(A股 上证/深成/创业板指 红涨绿跌 + 币圈 BTC/ETH/SOL 绿涨红跌,各带小条)③ 今日信号(≤5 条派生事实,涨停情绪/温度/成交/上涨占比/恐慌贪婪/市值24h/领涨币)④ A股机会(score chip 抄 stock.js oppScore,无 indPct 故不挂"板块强势")+ 币圈动量(24h 涨幅 top3,非评分)。只消费已有公开端点:`/api/stock/market` `/api/stock/opportunity` `/api/crypto/overview` `/api/me`(右上登录 chip)。纯函数顶层可 `node public/hub.js` 自检。公式与页面一致:aTemp(抄 stock marketTemp:指数40/涨跌家数40/涨停跌停20,缺项剔权重)、fngLabel/fngColor(抄 crypto.js)、pulseTone、heatColor。A股/币圈各列按本市场习惯着色,总览其余色块绿=暖/升、红=冷/跌。⚠️ 负数百分号:`sp()` 只补 `+`,负号靠 `.toFixed()` 自带,否则会显示 `--1%`(已修,勿改回)。海外源挂代理期间币圈列可能短暂全 ✗,60s 自愈重试。
+**首页 `public/hub.html`+`public/hub.js`(2026-09 改为"投资雷达",不再是卡片门户)**:公开页,复用 theme.css 深色规格。顶栏链到 A股/币圈/我的财富🔒(dashboard)/流水🔒(cashflow)/持仓🔒(holdings)。四区:① MARKET PULSE(一句话氛围 + 两个 conic-gradient 圆环仪表:A股温度 / 币圈恐慌贪婪)② 双列行情(A股 上证/深成/创业板指 红涨绿跌 + 币圈 BTC/ETH/SOL 绿涨红跌,各带小条)③ 今日信号(≤5 条派生事实,涨停情绪/温度/成交/上涨占比/恐慌贪婪/市值24h/领涨币)④ A股机会(score chip 抄 stock.js oppScore,无 indPct 故不挂"板块强势")+ 币圈动量(24h 涨幅 top3,非评分)。只消费已有公开端点:`/api/stock/market` `/api/stock/opportunity` `/api/crypto/overview`(右上登录 chip 由共享 nav.js 取 `/api/me`,hub.js 不自己拉)。纯函数顶层可 `node public/hub.js` 自检。公式与页面一致:aTemp(抄 stock marketTemp:指数40/涨跌家数40/涨停跌停20,缺项剔权重)、fngLabel/fngColor(抄 crypto.js)、pulseTone、heatColor。A股/币圈各列按本市场习惯着色,总览其余色块绿=暖/升、红=冷/跌。⚠️ 负数百分号:`sp()` 只补 `+`,负号靠 `.toFixed()` 自带,否则会显示 `--1%`(已修,勿改回)。海外源挂代理期间币圈列可能短暂全 ✗,60s 自愈重试。
 
 - **登录**:`@midwayjs/session` cookie session;`AuthMiddleware` 只守数据 API(正则 `/^\/(money|api\/holding)(\/|$)/` → 401 JSON),静态 HTML 不守,页面 JS 收 401 跳 `login.html?back=本页`。密码 scrypt(`salt:hex`),哈希生成:`node -e "console.log(require('./dist/service/auth.service').hashPassword('密码'))"`。
 - **建表/种子**:`node scripts/seed_v1.js`(幂等,从 config 读密码,执行 data/mysql.sql 的"四板块 v1"段)→ 建 `users` + `holding`(已灌 11 只自选,含 2 港股)。users 行手工插(占位 INSERT 在 data/mysql.sql 注释里)。
-- **v1 只有免费源**:大A/持仓报价走腾讯 qt(GBK,服务端 60s 缓存);币圈 Binance vision/alternative.me/CoinGecko/fapi/OKX/Bybit(30s 缓存,逐源 ok/error,失败不白屏)。妙想选股/资讯、飞书推送留细化阶段。
+- **v1 只有免费源**:大A/持仓报价走腾讯 qt(GBK,服务端 60s 缓存);币圈 Binance vision→`api.binance.com` 镜像回退 /alternative.me/CoinGecko/fapi/OKX/Bybit(30s 缓存,逐源 ok/error,失败不白屏);`/api/crypto/overview` 另带 `fut.binance`(BTC/ETH fapi 资金费率/持仓额/多空比,hub 币圈 strip 徽标,缺 → '—')。**妙想 MX 兜底已启用**:env `MX_APIKEY`(勿提交/打印),`src/service/mx.service.ts` `screen()/news()`(60s 冷却+缓存,只解析不改上游);东财失败时 `/api/stock/opportunity|news` 回 `{em,mx}`,前端(股票/hub)择 ok 者并注明"东财不可用,当前为妙想兜底"。飞书推送留细化阶段。
 - **海外源要挂代理**:`src/util/net.ts` `scutil --proxy` 探测系统代理并设 HTTPS_PROXY/NO_PROXY(gtimg.cn 直连)。⚠️ 未探到代理时 60s 重探一次(先开服务后开代理会自动接上;以前一次性缓存"无代理"会致海外源全部 8s 超时直到重启)。
+- **统一顶栏(nav.js,2026-09)**:6 个雷达页(hub/stock/crypto/dashboard/cashflow/holdings)共用 theme.css header 骨架 + `public/nav.js`(各页在自身主 js 之前引入,login.html 居中卡片不加):brand 光点 + `<h1>` + 六链接 `<nav>`(总览/A股/币圈/我的财富🔒/流水🔒/持仓🔒)+ 各页右侧控件 + `#who`。nav.js 按 `location.pathname` 文件名给匹配链接标 `.on`(`navActive` 顶层纯函数),并渲染 `#who`(未登录 `登录` → `login.html?back=本页`;已登录 `用户名`+`退出` POST `/api/logout`)。hub.js 已删自身 renderWho,勿双实现。
 - ⚠️ **新 Chrome 不提升块内 function 声明**:各页 `loadAndRender()` 定义在 `if (typeof window…)` 块内并在块内自调用,HTML 尾部不要再写 `<script>loadAndRender()</script>`(dashboard.js 是顶层定义,不受影响)。
-- 自检:`node public/stock.js|crypto.js|cashflow.js|dashboard.js`;行情解析单测 `npx jest test/qt.test.ts`。
+- 自检:`node public/stock.js|crypto.js|cashflow.js|dashboard.js|hub.js`;行情解析单测 `npx jest test/qt.test.ts test/mx.test.ts`。
 
 ## 数据库
 
-- 建表 SQL:`mysql.sql`、`data/mysql.sql`
+- 建表 SQL:`data/mysql.sql`(根目录旧 `mysql.sql` 已删)
+- `GET /` 302 → `/public/hub.html`(首页即投资雷达)
 - ⚠️ 数据库密码明文提交在 `config.default.ts` 和 README 中,改动时注意别外传
 
 ## 约定

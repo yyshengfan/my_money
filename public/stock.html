@@ -90,10 +90,17 @@
 </head>
 <body>
 <header>
-  <h1>大A股票</h1>
-  <a class="navlink" href="hub.html">← 门户</a>
-  <a class="navlink" href="crypto.html">币圈 →</a>
+  <div class="brand"><span class="dot"></span><h1>大A股票</h1></div>
+  <nav>
+    <a href="hub.html">总览</a>
+    <a href="stock.html">A股</a>
+    <a href="crypto.html">币圈</a>
+    <a href="dashboard.html">我的财富<span class="lk">🔒</span></a>
+    <a href="cashflow.html">流水<span class="lk">🔒</span></a>
+    <a href="holdings.html">持仓<span class="lk">🔒</span></a>
+  </nav>
   <div class="pills"><button id="refresh">刷新</button></div>
+  <div class="who" id="who"></div>
 </header>
 <div class="status" id="status">加载中…</div>
 
@@ -147,6 +154,7 @@
 
   <p class="foot">数据源(免 key):指数行情/成交额来自腾讯 qt,涨跌家数、行业板块、涨停池、全A 排行与资讯来自东方财富公开接口;服务端缓存 60s。A股惯例红涨绿跌。「今日机会」为仅基于涨跌幅/主力净流入/换手/量比/PE/PB 的启发式评分(Top6,剔涨停与过热),评分权重见卡片下注记——它只回答「今天资金与动量选了谁」,不含业绩/ROE/股息率、北向(官方停发)与逐笔,非投资建议。东方财富接口对本网络偶发限流,失败会在对应卡片标 ✗,过 1-2 分钟刷新即恢复;资讯「政策/市场/公司」标签仅为关键词粗分,非精准影响对象。妙想选股等增强源留待后续。</p>
 </main>
+<script src="nav.js"></script>
 <script src="stock.js"></script>
 </body>
 </html>

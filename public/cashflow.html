@@ -9,8 +9,8 @@
 <style>
   /* 页面私有样式;共用规格(令牌/画布/顶栏/面板/pill/foot)见 theme.css */
 
-  /* 月份翻页:与 dashboard 同用 .pills,靠右控件区 */
-  .mwrap{margin-left:auto;display:flex;align-items:center;gap:10px}
+  /* 月份翻页:与 dashboard 同用 .pills;靠右已由顶栏 nav 的 auto 完成 */
+  .mwrap{display:flex;align-items:center;gap:10px}
   .mwrap .pills{margin-left:0}
   .mwrap .pills button{font-size:14px}
   .mwrap .pills button:disabled{opacity:.3;cursor:default}
@@ -60,9 +60,15 @@
 </head>
 <body>
   <header>
-    <h1>资金流水</h1>
-    <a class="navlink" href="hub.html">← 门户</a>
-    <a class="navlink" href="dashboard.html">← 我的财富</a>
+    <div class="brand"><span class="dot"></span><h1>资金流水</h1></div>
+    <nav>
+      <a href="hub.html">总览</a>
+      <a href="stock.html">A股</a>
+      <a href="crypto.html">币圈</a>
+      <a href="dashboard.html">我的财富<span class="lk">🔒</span></a>
+      <a href="cashflow.html">流水<span class="lk">🔒</span></a>
+      <a href="holdings.html">持仓<span class="lk">🔒</span></a>
+    </nav>
     <div class="mwrap">
       <span class="asof" id="asof"></span>
       <div class="pills" role="group" aria-label="月份翻页">
@@ -71,6 +77,7 @@
         <button id="next" aria-label="下一月">›</button>
       </div>
     </div>
+    <div class="who" id="who"></div>
   </header>
   <div class="status" id="status">加载数据中…</div>
 
@@ -99,6 +106,7 @@
   </div>
 
   <p class="foot">口径说明:账本字段「总出帐/生活开支」会把理财市值波动记进去(如 2026-05 备注含 A股/币亏损),本页一律不用,只呈现进账与显性支出(信用卡+房租+房贷+社保+其他)。支出环比箭头用中性色 —— 支出下降是好事,不标绿也不标红。</p>
+<script src="nav.js"></script>
 <script src="cashflow.js"></script>
 </body>
 </html>
