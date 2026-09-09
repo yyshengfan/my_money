@@ -6,6 +6,7 @@ import { QtService } from './qt.service';
  * A股行情聚合:腾讯 qt(指数行情,直连)+ 东方财富(涨跌家数/板块/涨停池/全A列表/资讯,走系统代理)。
  * 东方财富 push2 的 clist 接口在本网络偶发空返/断连(疑似边缘限流),统一:
  *   https + &cb=cb(JSONP)拉取,失败隔 ~0.9s 重试一次,再失败整源标 {ok:false,error};
+ *   push2 被限流时 emJsonp 自动改走延迟镜像 push2delay(约滞后 15 分钟,同构字段)兜底;
  * 绝不因单一上游不可用让整页白屏。行情按北京时间算日期(收盘后取当日)。
  */
 const REF = { referer: 'https://quote.eastmoney.com/', 'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36' };
@@ -116,28 +117,38 @@ function qClist<T>(url: string, fn: () => Promise<T>): Promise<T> {
   return p;
 }
 // 东财接口被限流时会持续失败数分钟(本机实测有"秒断"与"挂到超时"两种形态)。
-// 失败结果按"域名"短缓存 12s —— 东财限流按主机维度,一次 clist 失败意味着同主机的其余调用
-// 大概率也失败,冷却整主机让 boards 的 4 路 clist 与板块请求在 12s 内快速红卡,
-// 而不是各自把 9s×2 超时吃满(最坏 ~76s)。连点刷新立即红卡不反复重打上游;到点自动重试自愈。
-const emDown = new Map<string, number>();
+// emDown 记「主机冷却到何时」:限流按主机维度,一次 clist 失败意味着同主机其余调用大概率也失败,
+// 冷却整主机让 boards 多路 clist 与板块请求快速红卡,而不是各自把 9s×2 超时吃满。
+// push2(实时)被限流时,改走本网络可达的延迟镜像主机 push2delay.eastmoney.com(数据约滞后 15 分钟,
+// 行情可用性优先);镜像兜底成功后把 push2 冷却拉长到 5 分钟,免得每 12s 撞一次超时,到点自动复测自愈。
+const emDown = new Map<string, number>(); // host -> 冷却截止时间戳
 const emHost = (url: string) => new URL(url).host;
+const PUSH2 = 'push2.eastmoney.com';
+const PUSH2D = 'push2delay.eastmoney.com';
 async function emJsonp(url: string): Promise<any> {
   const host = emHost(url);
-  const downAt = emDown.get(host);
-  if (downAt && Date.now() - downAt < 12_000) throw new Error('东方财富接口暂不可用(限流冷却中)');
-  // https+cb(JSONP);偶发断连 → 隔 0.9s 重试一次,再失败抛错由 safe() 接住
-  for (let i = 0; i < 2; i++) {
-    try {
-      const buf = await getBuffer(url, 9000, REF);
-      const j = JSON.parse(stripJsonp(Buffer.from(buf).toString('utf8')));
-      emDown.delete(host); // 成功即解除该主机冷却
-      return j;
-    } catch {
-      if (i === 0) await sleep(900);
+  const alt = host === PUSH2 ? url.replace(PUSH2, PUSH2D) : null; // 仅实时主机备延迟镜像
+  const cands: Array<[string, number]> = alt ? [[url, 2], [alt, 1]] : [[url, 2]]; // [url, 尝试次数]
+  let lastErr: any = new Error('东方财富接口两次请求失败');
+  for (const [u, tries] of cands) {
+    const h = emHost(u);
+    const cd = emDown.get(h);
+    if (cd && Date.now() < cd) { lastErr = new Error('东方财富接口暂不可用(限流冷却中)'); continue; }
+    for (let i = 0; i < tries; i++) {
+      try {
+        const buf = await getBuffer(u, 9000, REF);
+        const j = JSON.parse(stripJsonp(Buffer.from(buf).toString('utf8')));
+        emDown.delete(h); // 成功即解除该主机冷却
+        if (alt && u !== url) emDown.set(host, Date.now() + 300_000); // 镜像兜底成功:主主机 5 分钟后再复测
+        return j;
+      } catch (e) {
+        lastErr = e;
+        if (i === 0) await sleep(900);
+      }
     }
+    emDown.set(h, Date.now() + 12_000);
   }
-  emDown.set(host, Date.now());
-  throw new Error('东方财富接口两次请求失败');
+  throw lastErr;
 }
 // 排序拉全A列表:取前 pz 行(po=1 降序,po=0 升序),串行走 clist 队列
 async function clistSort(rank: string, pz: number, po: number, fields: string) {

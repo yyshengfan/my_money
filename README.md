@@ -48,3 +48,4 @@ $ npm start
 4. typeorm-model-generator -h 127.0.0.1 -p 3306 -d tianhuiaccount -u root -x Th21211314~~ -e mysql -o ./src/entity
 
 
+node scripts/seed_user.js <用户名> <新密码>

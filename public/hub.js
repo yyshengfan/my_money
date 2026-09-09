@@ -75,6 +75,21 @@ function fmtQuoteTime(t) {
   if (d.length >= 12) return `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)} ${d.slice(8, 10)}:${d.slice(10, 12)}`;
   return s || '—';
 }
+function fmtClock(d) { // 'YYYY-MM-DD HH:MM:SS 星期X'(hero「时间」meta)
+  const p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())} 星期${'日一二三四五六'[d.getDay()]}`;
+}
+// 市值分布:取按市值最大 5 币 + 「其他」补足 100%(用于 hero 圆环)
+function capSlices(domArr, totalUsd) {
+  const tot = pN(totalUsd);
+  if (!Array.isArray(domArr) || tot == null || tot <= 0) return null;
+  const rows = domArr.filter(x => x && x.sym && pN(x.cap) > 0)
+    .sort((a, b) => pN(b.cap) - pN(a.cap)).slice(0, 5);
+  const items = rows.map(x => ({ sym: x.sym, share: pN(x.cap) / tot * 100 }));
+  const other = 100 - items.reduce((a, x) => a + x.share, 0);
+  if (other > 0.5) items.push({ sym: '其他', share: other });
+  return { items, tot };
+}
 
 // A股机会启发式评分(完整抄 stock.js oppScore:流入30+走势25+健康20+估值15;涨停剔除,过热封顶55带标)
 function oppScore(r, indPct) {
@@ -180,19 +195,22 @@ if (typeof window !== 'undefined') {
   const $ = id => document.getElementById(id);
   const PULSE_COL = { A股: '#4f8cff', BTC: '#f7931a', ETH: '#8ea3ff', SOL: '#58d68d' };
 
-  function renderGauge(holder, { name, val, color, note }) {
-    const pv = Math.max(0, Math.min(100, val));
-    holder.innerHTML = `<div class="gauge"><div class="ring" style="--p:${Math.max(pv, 2)};--c:${color}">
-        <b>${Math.round(pv)}</b><i>${esc(name)}</i></div>
-      <div class="gl"><span class="t" style="color:${color}">${esc(note)}</span><span class="s">${esc(name)}读数 · 启发式</span></div></div>`;
+  const CAP_COL = { BTC: '#f7931a', ETH: '#8ea3ff', SOL: '#58d68d', BNB: '#f0b90b', XRP: '#b9a4ff', USDT: '#26a17b', USDC: '#6b9bff' };
+  const CAP_FALL = ['#3b82f6', '#54a5ff', '#6b8cff', '#a76bff', '#e05d9e'];
+  function capColor(sym, i) { return CAP_COL[sym] || CAP_FALL[i % CAP_FALL.length]; }
+  function fmtIdxPx(x) { // 指数大数字:2 位小数(≥1000 也要保留小数)
+    const n = pN(x); if (n == null) return '—';
+    return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
-  function renderPulse(d) {
+  // ① hero:左 氛围标题+时间 / 中 A股三大指数大数字 / 右 市值分布圆环
+  function renderHero(d) {
     const qmap = {}; const qs = (d.qt && d.qt.ok && d.qt.data) || [];
     qs.forEach(r => { if (r && r.ok) qmap[r.code] = r; });
     const sh = qmap['sh000001'];
+    const br = (d.breadth && d.breadth.ok && d.breadth.data) || null;
     const temp = aTemp(sh ? sh.chgPct : null,
-      (d.breadth && d.breadth.ok && d.breadth.data && pN(d.breadth.data.ratio)) || null,
+      (br && pN(br.ratio)) != null ? pN(br.ratio) : null,
       d.limit && d.limit.ok && d.limit.data ? d.limit.data.zt : null,
       d.limit && d.limit.ok && d.limit.data ? d.limit.data.dt : null);
     const ov = d.crypto || {};
@@ -202,39 +220,56 @@ if (typeof window !== 'undefined') {
     const g = (ov.global && ov.global.ok && ov.global.data) || null;
     const mcap = g ? pN(g.mcapChgPct) : null;
     const tone = pulseTone(temp, fng, mcap);
-    const subA = temp ? `A股 ${temp.label} 温度${temp.score}` : 'A股 数据待取';
-    const subC = fng != null
-      ? `币圈 ${fngLabel(fng)} ${Math.round(fng)}${mcap != null ? ` · 市值 24h ${sp(mcap)}${mcap.toFixed(1)}%` : ''}`
-      : mcap != null ? `币圈 市值 24h ${sp(mcap)}${mcap.toFixed(1)}%` : '币圈 数据待取';
-    $('pulse-hl').innerHTML = `<span class="hd">${tone.dot} ${esc(tone.txt)}</span>
-      <small>${esc(tone.hd)} · ${esc(subA)} · ${esc(subC)}</small>`;
-    const holder = $('pulse-g'); holder.innerHTML = '';
-    if (temp) renderGauge(holder, { name: 'A股温度', val: temp.score, color: temp.color, note: `A股 ${temp.label}` });
-    if (fng != null) renderGauge(holder, { name: '恐慌贪婪', val: fng, color: fngColor(fng), note: fngLabel(fng) });
-    else if (mcap != null) renderGauge(holder, { name: '市值24h', val: 50 + mcap, color: mcap >= 0 ? 'var(--up)' : 'var(--down)', note: mcap >= 0 ? '市值回升' : '市值回落' });
-    if (!holder.innerHTML) holder.innerHTML = '<div class="note">等数据…</div>';
+    $('pulse-hl').textContent = `${tone.dot} ${tone.txt}`;
+    $('pulse-sub').textContent = tone.hd;
+    const asOf = qs.map(r => r.time).find(t => t);
+    $('pulse-meta').textContent = `🕘 ${fmtClock(new Date())} · 行情截至 ${fmtQuoteTime(asOf) || '—'}`;
+
+    const want = [['sh000001', '上证指数'], ['sz399001', '深证成指'], ['sz399006', '创业板指']];
+    $('pulse-idx').innerHTML = want.map(([code, fb]) => {
+      const r = qmap[code];
+      if (!r) return `<div class="ix"><span class="nm">${fb}</span><b>—</b><span class="ch dim">无行情</span></div>`;
+      const up = r.chgPct >= 0; // A股:红涨绿跌
+      return `<div class="ix"><span class="nm">${esc(r.name || fb)}</span><b>${fmtIdxPx(r.price)}</b>
+        <span class="ch ${up ? 'rna' : 'gna'}">${up ? '▲' : '▼'} ${sp(r.chgPct)}${pN(r.chgPct).toFixed(2)}%</span></div>`;
+    }).join('');
+
+    const dom = (ov.dom && ov.dom.ok) ? ov.dom.data : null;
+    const s = capSlices(dom, g ? g.totalUsd : null);
+    const cap = $('pulse-cap'), lg = $('pulse-lg');
+    if (!s) {
+      cap.innerHTML = `<div class="cdonut" style="background:#18243a"></div><b><em>—</em><small>总市值</small></b>`;
+      lg.innerHTML = '<span class="dim">币圈行情待取</span>';
+    } else {
+      let cum = 0;
+      const segs = s.items.map((x, i) => {
+        const a = cum.toFixed(2) + '%', b = (cum += x.share).toFixed(2) + '%';
+        return `${capColor(x.sym, i)} ${a} ${b}`;
+      }).join(',');
+      cap.innerHTML = `<div class="cdonut" style="background:conic-gradient(${segs})"></div>
+        <b><em>${fmtUsdShort(s.tot)}</em><small>总市值</small></b>`;
+      lg.innerHTML = s.items.map((x, i) =>
+        `<span><i style="background:${capColor(x.sym, i)}"></i>${esc(x.sym)} ${x.share.toFixed(1)}%</span>`).join('');
+    }
     return { qmap, temp };
   }
 
-  function renderAIndex(qmap) {
-    const want = [['sh000001', '上证指数'], ['sz399001', '深证成指'], ['sz399006', '创业板指']];
-    $('ashare-idx').innerHTML = want.map(([code]) => {
-      const r = qmap[code];
-      if (!r) return `<div class="qrow"><span class="nm">${esc(code)}</span><span class="dim">无行情</span></div>`;
-      const up = r.chgPct >= 0, cls = up ? 'rna' : 'gna'; // A股:红涨绿跌
-      return `<div class="qrow"><span class="nm">${esc(r.name)}</span>
-        <span class="pv">${fmtPrice(r.price)}</span>
-        <span class="ch ${cls}">${up ? '▲' : '▼'} ${sp(r.chgPct)}${pN(r.chgPct).toFixed(2)}%</span></div>`;
-    }).join('');
-  }
-  function renderAStrip(d, qmap) {
-    const lim = (d.limit && d.limit.ok && d.limit.data) || null;
+  // ② A股面板改为全市场派生细项(三大指数已在 hero 大数字展示)
+  function renderAStats(d, qmap, temp) {
     const sh = qmap['sh000001'], szi = qmap['sz399106'];
-    const sb = (k, v, cls = '') => `<div class="sb"><span class="k">${k}</span><span class="v ${cls}">${v}</span></div>`;
-    $('ashare-strip').innerHTML =
-      sb('涨停', lim ? pN(lim.zt).toLocaleString('zh-CN') : '—', 'rna') +
-      sb('跌停', lim ? pN(lim.dt).toLocaleString('zh-CN') : '—', 'gna') +
-      sb('两市成交额', (sh && szi) ? turnoverTxt(sh.amountWan, szi.amountWan) : '—');
+    const lim = (d.limit && d.limit.ok && d.limit.data) || null;
+    const br = (d.breadth && d.breadth.ok && d.breadth.data) || null;
+    const row = (k, v, color = '') => `<div class="srow"><span class="k">${k}</span>
+      <span class="v" style="${color ? `color:${color}` : ''}">${v}</span></div>`;
+    let html = row('A股市场温度', temp ? `${temp.score} · ${temp.label}` : '—', temp ? temp.color : '');
+    html += row('涨停 / 跌停', lim && pN(lim.zt) != null
+      ? `${pN(lim.zt).toLocaleString('zh-CN')} / ${pN(lim.dt).toLocaleString('zh-CN')}` : '—');
+    html += row('两市成交额', (sh && szi) ? turnoverTxt(sh.amountWan, szi.amountWan) : '—');
+    if (br && pN(br.ratio) != null) {
+      const r = pN(br.ratio);
+      html += row('上涨家数占比', `${(r * 100).toFixed(0)}%`, r >= 0.5 ? '#ff9d9d' : '#7fd7a0');
+    }
+    $('ashare-stats').innerHTML = html || '<div class="note">A股数据待取</div>';
   }
 
   function renderCIdx(ov) {
@@ -325,9 +360,8 @@ if (typeof window !== 'undefined') {
     ]).then(([jm, jo, jc]) => {
       const d = (jm && jm.data) || {};
       d.crypto = (jc && jc.data) || {};
-      const { qmap, temp } = renderPulse(d);
-      renderAIndex(qmap);
-      renderAStrip(d, qmap);
+      const { qmap, temp } = renderHero(d);
+      renderAStats(d, qmap, temp);
       renderCIdx(d.crypto);
       // 今日信号需跨 market+crypto 的派生事实
       const qs = (d.qt && d.qt.ok && d.qt.data) || [];

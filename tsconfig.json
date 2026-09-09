@@ -2,8 +2,9 @@
   "compileOnSave": true,
   "compilerOptions": {
     "target": "es2018",
-    "module": "commonjs",
-    "moduleResolution": "node",
+    "module": "node16",
+    "moduleResolution": "node16",
+    "strict": false,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
     "inlineSourceMap":true,
