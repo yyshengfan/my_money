@@ -3,6 +3,7 @@ import { Context } from '@midwayjs/koa';
 import { AuthService } from '../service/auth.service';
 import { LoginDTO } from '../dto/login.dto';
 
+// 2026-09:全站开放登录(非 tianhui 一律演示模式假数据),原防爆破锁定机制随之失去意义,已删。
 @Controller('/api')
 export class AuthController {
   @Inject()
@@ -14,10 +15,6 @@ export class AuthController {
   @Post('/login')
   async login(@Body(ALL) params: LoginDTO) {
     const username = await this.authService.login(params.username, params.password);
-    if (!username) {
-      this.ctx.status = 401;
-      return { success: false, message: '账号或密码错误', data: null };
-    }
     return { success: true, message: 'OK', data: { username } };
   }
 

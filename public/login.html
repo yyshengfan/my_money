@@ -4,10 +4,28 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>登录</title>
-<link rel="stylesheet" href="theme.css">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="stylesheet" href="theme.css?v=20260921a">
 <style>
-  /* 页面私有样式;共用规格见 theme.css */
-  .box{max-width:380px;margin:8vh auto 0}
+  /* 页面私有样式;共用规格见 theme.css。顶栏在上,登录卡剩余视口居中;
+     背景 = 系统 --bg 深墨蓝 + 上方一抹 --asset 蓝辉光(与导航条同色系),面板加同色弱投影 */
+  body{min-height:100vh;display:flex;flex-direction:column;
+    background:radial-gradient(1000px 520px at 50% 15%,rgba(79,140,255,.10),transparent 65%),var(--bg)}
+  /* 探索感背景:星图点阵 + 黄金对数螺线 + 正弦波,数学式生成并持续动画(纯 CSS keyframes,零逐帧 JS) */
+  #bg{position:fixed;inset:0;width:100%;height:100%;z-index:-1}
+  #bg .ln{fill:none;stroke:rgba(84,165,255,.15);stroke-width:1.2}
+  #bg #spiral{transform-box:view-box;transform-origin:72% 46%;animation:spin 120s linear infinite}
+  #bg #wave{animation:drift 14s linear infinite}
+  #bg .tw{animation:twinkle 6s ease-in-out infinite}
+  #bg .star{fill:#54a5ff;animation:twinkle 5s ease-in-out infinite}
+  #bg #grdr{animation:breathe 11s ease-in-out infinite alternate}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @keyframes drift{to{transform:translateX(-754px)}}
+  @keyframes twinkle{0%,100%{opacity:.25}50%{opacity:1}}
+  @keyframes breathe{from{opacity:.45}to{opacity:1}}
+  @media(prefers-reduced-motion:reduce){#bg *{animation:none}}
+  .box{max-width:380px;width:100%;margin:auto}
+  .box .panel{border-color:#22345a;box-shadow:0 24px 64px -32px rgba(31,92,255,.45)}
   .box form{padding:22px;display:grid;gap:12px}
   .box label{font:500 10px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--ink-2)}
   .box input{width:100%;margin-top:6px;background:#0b0f15;border:1px solid var(--border);border-radius:6px;color:var(--ink);font:400 14px/1 var(--mono);padding:10px 12px}
@@ -15,9 +33,23 @@
   .box button{margin-top:6px;font:600 13px/1 var(--mono);letter-spacing:.05em;color:var(--bg);background:var(--asset);border:none;border-radius:6px;padding:12px;cursor:pointer}
   .box button:hover{background:#6ba1ff}
   .msg{min-height:14px;font:400 12px/1.5 var(--mono);color:var(--down)}
+  .tip{font:400 11px/1.7 var(--mono);color:var(--ink-2);border-top:1px dashed var(--border);padding-top:10px}
 </style>
 </head>
 <body>
+<svg id="bg" aria-hidden="true" preserveAspectRatio="xMidYMid slice"></svg>
+<header>
+  <div class="brand"><span class="dot"></span><h1>登录</h1></div>
+  <nav>
+    <a href="hub.html">总览</a>
+    <a href="crypto.html">币圈</a>
+    <a href="stock.html">A股</a>
+    <a href="dashboard.html">我的财富<span class="lk">🔒</span></a>
+    <a href="cashflow.html">流水<span class="lk">🔒</span></a>
+    <a href="holdings.html">持仓<span class="lk">🔒</span></a>
+  </nav>
+  <div class="who" id="who"></div>
+</header>
 <div class="box">
   <div class="panel">
     <div class="phead"><div class="eyebrow">Sign in</div><h2>登录</h2></div>
@@ -26,10 +58,47 @@
       <div><label for="p">密码</label><input id="p" name="password" type="password" autocomplete="current-password" required></div>
       <button type="submit">进入</button>
       <div class="msg" id="msg"></div>
+      <div class="tip">👀 账号密码？你猜猜看 </div>
     </form>
   </div>
   <p class="foot"><a class="navlink" href="hub.html">← 门户</a> 登录后将回到你要看的页面;大A与币圈板块无需登录。</p>
 </div>
+<script src="nav.js?v=20260921a"></script>
+<script>
+  /* 背景 = 数学规律图形,持续演变:① 点阵星图呼吸明暗 ② 黄金对数螺线 r=a·φ^(2θ/π) 绕极点缓转,
+     航点交错闪烁 ③ 正弦波(波长恰为 754,CSS 平移一个波长无缝循环)左移 ④ 13 颗"星"按黄金角
+     (0.618 低差异序列)散布闪烁。动画全在 CSS keyframes,这里只生成一次几何 */
+  (function () {
+    const w = 1600, h = 900, phi = (1 + Math.sqrt(5)) / 2, svg = document.getElementById('bg');
+    svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+    const cx = w * 0.72, cy = h * 0.46;
+    const pts = [], nodes = [];
+    for (let t = 0; t < Math.PI * 7; t += 0.06) {
+      const r = 4 * Math.pow(phi, t * 2 / Math.PI);
+      if (r > w) break;
+      const x = cx + r * Math.cos(t), y = cy + r * Math.sin(t);
+      pts.push(`${x.toFixed(1)},${y.toFixed(1)}`);
+      if (Math.abs(t % (Math.PI / 2)) < 0.031) nodes.push([x, y, Math.min(2 + r / 160, 4)]); // 每 90° 打一个"航点"
+    }
+    const P = 754; // 波长,与 @keyframes drift 的平移量一致 → 无缝
+    let wave = '';
+    for (let x = -P; x <= w + P; x += 6) wave += `${wave ? 'L' : 'M'}${x},${(h * 0.8 + Math.sin(2 * Math.PI * x / P) * 40).toFixed(1)}`;
+    const stars = [];
+    for (let i = 1; i <= 13; i++) { // 黄金角散布:frac(i·φ) 低差异序列,永不重叠
+      stars.push(`<circle class="star" style="animation-delay:${(i * 0.7).toFixed(1)}s" cx="${((i * phi % 1) * w).toFixed(0)}" cy="${((i * 0.7548225 % 1) * h).toFixed(0)}" r="${1.5 + (i % 3)}"/>`);
+    }
+    svg.innerHTML = `<defs><pattern id="grid" width="26" height="26" patternUnits="userSpaceOnUse">
+        <circle cx="1.3" cy="1.3" r="1.3" fill="rgba(84,165,255,.09)"/></pattern></defs>
+      <rect id="grdr" width="${w}" height="${h}" fill="url(#grid)"/>
+      <g id="spiral"><path class="ln" d="M${pts.join('L')}"/>
+        ${nodes.map((n, i) => `<g class="tw" style="animation-delay:${(i * 1.7).toFixed(1)}s">
+          <circle cx="${n[0].toFixed(1)}" cy="${n[1].toFixed(1)}" r="${(n[2] * 3.5).toFixed(1)}" fill="rgba(84,165,255,.14)"/>
+          <circle cx="${n[0].toFixed(1)}" cy="${n[1].toFixed(1)}" r="${n[2].toFixed(1)}" fill="#54a5ff"/></g>`).join('')}
+      </g>
+      <path id="wave" class="ln" d="${wave}" opacity=".55"/>
+      ${stars.join('')}`;
+  })();
+</script>
 <script>
   document.getElementById('f').onsubmit = async e => {
     e.preventDefault();
@@ -42,6 +111,8 @@
     }).catch(() => null);
     const j = r && await r.json().catch(() => null);
     if (j && j.success) {
+      // 换身份登录前清掉上一账号(或未登录时)的 SWR 缓存,防止真/演示数据串号
+      if (window.purgeApiCache) window.purgeApiCache();
       location.href = new URLSearchParams(location.search).get('back') || 'hub.html';
     } else {
       msg.textContent = (j && j.message) || '登录失败,请重试';

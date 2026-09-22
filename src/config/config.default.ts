@@ -8,7 +8,8 @@ export default {
   // use for cookie sign key, should change to your own and keep security
   keys: '1715828458675_5336',
   koa: {
-    port: 7001,
+    // APP_PORT 可覆盖:7001 常年被 launchd prod 占用,本地起 dev 用 APP_PORT=7301 npm run dev 并存
+    port: Number(process.env.APP_PORT) || 7001,
   },
   typeorm: {
     dataSource: {

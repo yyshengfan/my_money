@@ -4,88 +4,278 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>大A股票</title>
-<link rel="stylesheet" href="theme.css">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="stylesheet" href="theme.css?v=20260921a">
 <style>
-  /* 页面私有样式;共用规格见 theme.css。A股按境内习惯:红涨绿跌 */
-  .rn{color:var(--down)} .gn{color:var(--up)}
+  /* 页面私有样式;共用规格见 theme.css。涨跌配色全站统一:绿涨红跌(类名 rn=涨 gn=跌 沿旧命名,颜色已对调) */
+  .rn{color:var(--up)} .gn{color:var(--down)}
   .mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
   .dim{color:var(--ink-2)} .small{font-size:11.5px} .xi{font-size:10px;color:var(--ink-2)}
   .src{padding:11px 18px 0;font:400 11.5px/1.6 var(--mono);color:var(--ink-2);flex-wrap:wrap;display:flex;gap:2px 14px}
   .src .k{color:#58d68d} .src .x{color:var(--down)}
   .err{padding:16px 18px;color:var(--ink-2);font-size:12.5px;line-height:1.6}
   main{display:grid;gap:14px}
-  .grid2{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:14px;align-items:stretch}
+  .grid2{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:14px;align-items:start}
   @media(max-width:920px){.grid2{grid-template-columns:1fr}}
-  .grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0}
-  @media(max-width:920px){.grid3{grid-template-columns:1fr}}
-  .gcol{min-width:0;padding:10px 16px 14px;border-left:1px solid var(--border)}
-  .gcol:first-child{border-left:none}
-  @media(max-width:920px){.gcol{border-left:none;border-top:1px solid var(--border);padding-top:12px}}
-  .gcol h3{font:500 10.5px/1 var(--mono);letter-spacing:.1em;color:var(--ink-2);margin:4px 0 8px;text-transform:uppercase}
 
-  /* ① 市场概况:四指数卡 + 底部读数条 */
+  /* ① 市场概况大标题头(参考「市场观察」图:左大标题+行情时间,右侧 4 张 KPI 读数卡同排) */
+  .mkt-hero{position:relative;padding:24px 22px 6px;overflow:hidden;display:grid;grid-template-columns:minmax(0,390px) minmax(0,1fr);gap:20px 28px;align-items:center}
+  .mkt-hero::before{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(55% 130% at 82% -30%,#13283f66 0%,transparent 60%),radial-gradient(45% 110% at 55% -20%,#10233a55 0%,transparent 65%)}
+  .mkt-hero::after{content:"";position:absolute;right:-60px;top:-140px;width:420px;height:300px;border-radius:50%;background:radial-gradient(closest-side,#1d4ed8,transparent 72%);filter:blur(90px);opacity:.22;pointer-events:none}
+  .mkt-hero>*{position:relative}
+  @media(max-width:1080px){.mkt-hero{grid-template-columns:1fr}}
+  .mh-tag{display:inline-flex;align-items:center;gap:8px;font:600 11.5px/1 var(--sans);letter-spacing:.1em;color:#9fb6d4}
+  .mh-tag::before{content:"";width:3px;height:14px;border-radius:2px;background:linear-gradient(#5aa2ff,#2f6fd0);box-shadow:0 0 8px #3f8cff88}
+  .mkt-hero h2{font-size:clamp(26px,3vw,32px);font-weight:700;letter-spacing:.01em;margin:11px 0 7px}
+  .mh-sub{font-size:12.5px;color:var(--ink-2)}
+  .mh-meta{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-top:13px;font:500 11px/1 var(--mono);color:var(--ink-2)}
+  .mh-meta .dt{color:#b9c7d9}
+  .mh-meta .arrow{color:#3c4c61}
+  .mh-meta .pill{border:1px solid #1d2d44;border-radius:999px;padding:4px 9px;color:#7fb0ff;background:#13223866}
+
+  /* ① 市场概况:右侧 4 张 KPI 读数卡(独立圆角卡,大数字+环比小字+占比条,同参考图) */
+  .mktstrip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;min-width:0}
+  @media(max-width:920px){.mktstrip{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  .ms{background:linear-gradient(180deg,#101826,#0d131c);border:1px solid var(--border);border-radius:12px;padding:12px 14px;display:grid;gap:6px;align-content:start;min-width:0;position:relative;overflow:hidden;transition:border-color .15s}
+  .ms::after{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(90% 70% at 85% 0%,#3f8cff14,transparent 60%)}
+  .ms:hover{border-color:#2a3a52}
+  .ms .k{font:500 10.5px/1 var(--mono);color:#a7b6c8;letter-spacing:.08em;white-space:nowrap}
+  .ms .v{font:600 20px/1.1 var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap;display:flex;align-items:baseline;gap:4px}
+  .ms .v i{font-style:normal;font-weight:400;color:var(--ink-2)}
+  .ms .sub{font:400 10px/1.4 var(--mono);color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ms .bar{display:flex;height:6px;border-radius:4px;overflow:hidden;background:#161d28}
+  .ms .bar b{display:block;height:100%}
+  .ms .bar.grad{background-image:linear-gradient(90deg,#58d68d,#ffd25e,#ff6b6b)}
+  .ms .bar.grad b{background:#0d131c;margin-left:auto;border-left:1px solid #2a3644}
+
+  /* ①-b 四指数卡:顶部涨跌光条 + 名称行涨跌幅徽标 */
   .idxrow{display:grid;gap:14px;grid-template-columns:repeat(4,1fr);padding:16px 18px 0}
   @media(max-width:900px){.idxrow{grid-template-columns:repeat(2,1fr)}}
   @media(max-width:520px){.idxrow{grid-template-columns:1fr}}
-  .idx{border:1px solid var(--border);border-radius:10px;padding:13px 15px;background:#0d131c;display:flex;flex-direction:column;gap:7px;min-width:0}
-  .idx .nm{font:500 11px/1 var(--mono);letter-spacing:.12em;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .idx{position:relative;border:1px solid var(--border);border-radius:10px;padding:14px 15px 13px;background:linear-gradient(180deg,#101826,#0d131c);display:flex;flex-direction:column;gap:8px;min-width:0;transition:transform .15s,border-color .15s}
+  .idx::before{content:"";position:absolute;top:0;left:0;right:0;height:2px;opacity:.9}
+  .idx.rn::before{background:linear-gradient(90deg,#58d68d,transparent 70%)}
+  .idx.gn::before{background:linear-gradient(90deg,#ff6b6b,transparent 70%)}
+  .idx:hover{transform:translateY(-2px);border-color:#2a3a52}
+  .idx .nm{font:500 11px/1 var(--mono);letter-spacing:.12em;color:var(--ink-2);display:flex;align-items:center;gap:8px}
+  .idx .nm .tx{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .idx .chip{flex:none;font:600 10px/1 var(--mono);padding:3.5px 7px;border-radius:99px;letter-spacing:.02em;color:var(--ink-2);background:#161d28}
+  .idx .chip.rn{color:#7fe0ac;background:#12291f} .idx .chip.gn{color:#ff9f9f;background:#2a1418}
   .idx .pv{font:600 clamp(20px,2.4vw,30px)/1.15 var(--mono);letter-spacing:-.01em}
-  .idx .ch{font:500 12.5px/1 var(--mono);display:flex;gap:12px}
+  .idx .ch{font:500 12.5px/1 var(--mono);display:flex;gap:12px;align-items:baseline}
   .idx .am{font:400 10.5px/1 var(--mono);color:var(--ink-2);margin-top:auto}
-  .mktstrip{display:grid;grid-template-columns:repeat(auto-fit,minmax(112px,1fr));gap:1px;background:var(--border);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin:14px 18px 16px}
-  .ms{background:#0d131c;padding:10px 13px;display:grid;gap:4px}
-  .ms .k{font:400 10px/1 var(--mono);color:var(--ink-2);letter-spacing:.06em}
-  .ms .v{font:600 14px/1 var(--mono)}
-  .ms.tmp .v{font-size:13px;display:flex;align-items:center;gap:7px}
-  .ms .sub{font:400 10px/1.5 var(--mono);color:var(--ink-2)}
 
-  /* 板块/排行列表行(公共) */
-  .listrow{position:relative;display:grid;grid-template-columns:minmax(0,1fr) 66px 92px 58px;gap:8px;align-items:center;padding:9px 18px;border-bottom:1px dashed #16202c;font-size:12.5px;overflow:hidden}
-  .listrow:last-child{border-bottom:none}
-  .listrow .bg{position:absolute;left:0;top:0;bottom:0;opacity:.14;pointer-events:none}
-  .listrow .n{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink)}
-  .listrow .s{font:400 10px/1 var(--mono);color:var(--ink-2);margin-left:8px}
-  .listrow .v{text-align:right;font-family:var(--mono);white-space:nowrap}
-  .listrow.head{color:var(--ink-2);border-bottom:1px solid var(--border);padding-top:12px}
-  .listrow.head .n{color:var(--ink-2);font-weight:500}
-  .board-top{border-top:1px solid var(--border)}
-  .pillrow{padding:13px 18px 2px}
+  /* ①-c 资金流向趋势(近7交易日主力净额条形,0 轴居中;正绿负红)+ 资金要点 */
+  .d7{display:grid;gap:8px;padding:12px 18px 4px}
+  .d7r{display:grid;grid-template-columns:64px minmax(0,1fr) 66px;align-items:center;gap:9px;min-width:0}
+  .d7 .dt{font:400 10px/1 var(--mono);color:var(--ink-2);white-space:nowrap}
+  .d7 .dt.live{color:#ffd25e}
+  .ftimes .lg{display:inline-block;width:8px;height:8px;border-radius:2px;margin:0 3px 1px 6px}
+  .fsvg{display:block;width:100%;height:clamp(130px,15vw,190px)}
+  .ftimes{display:flex;justify-content:space-between;gap:8px;font:400 10px/1.5 var(--mono);color:var(--ink-2);padding:3px 4px 0}
+  .d7h{margin:12px 0 2px;font:600 10.5px/1 var(--mono);color:var(--ink-2);letter-spacing:.08em}
+  .d7empty{padding:20px 18px;color:var(--ink-2);font-size:12px;line-height:1.7;text-align:center}
+  .d7 .dbar{position:relative;height:13px;background:#0d131c;border-radius:3px}
+  .d7 .dbar::before{content:"";position:absolute;left:50%;top:-2px;bottom:-2px;width:1px;background:#243349}
+  .d7 .dbar i{position:absolute;top:1px;bottom:1px;border-radius:2px}
+  .d7 .dbar .u{background:linear-gradient(90deg,#3fbf78,#58d68d);box-shadow:0 0 7px -1px #58d68d55}
+  .d7 .dbar .d{background:linear-gradient(90deg,#ff6b6b,#ff9b9b);box-shadow:0 0 7px -1px #ff6b6b66}
+  .d7 .dv{text-align:right;font:600 11px/1 var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+  .tkh{margin:12px 18px 6px;font:600 11px/1 var(--mono);color:#ffd25e;letter-spacing:.06em}
+  .tkpts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;background:var(--border);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin:12px 18px 4px}
+  .tk{background:#0d131c;padding:10px 13px;display:grid;gap:5px;min-width:0}
+  .tk .k{font:400 10px/1 var(--mono);color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tk .v{font:600 16px/1.1 var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+  .tk .d{font:400 10px/1.3 var(--mono);color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
-  /* ③ 今日机会卡片 */
-  .opps{display:grid;gap:9px;padding:12px 18px 4px}
-  .opp{border:1px solid var(--border);border-radius:9px;background:#0d131c;padding:10px 12px;display:grid;grid-template-columns:38px minmax(0,1fr);gap:4px 11px;align-items:start}
-  .opp .sc{grid-row:span 2;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font:700 13px/1 var(--mono);background:#15202e;color:var(--asset);margin-top:2px}
-  .opp .sc.hi{color:#ffd25e;background:#2a2413} .opp .sc.mid{color:var(--asset);background:#132238}
-  .opp .h{display:flex;align-items:baseline;gap:8px;min-width:0}
-  .opp .nm{font-weight:600;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  /* ② 资金流向三栏(参考「市场观察」):行业榜 | 趋势+要点 | 净流入榜+北向 */
+  .mgrid{display:grid;grid-template-columns:1fr}
+  @media(min-width:1180px){.mgrid{grid-template-columns:minmax(0,1.05fr) minmax(0,1.35fr) minmax(0,1fr)}}
+  .mcol{min-width:0;padding:10px 16px 12px}
+  @media(min-width:1180px){.mcol{border-left:1px solid var(--border)}.mcol:first-child{border-left:none}}
+  @media(max-width:1179px){.mcol{border-top:1px solid var(--border)}.mcol:first-child{border-top:none}}
+  .mcol .colh{margin:12px 0 2px}
+  .mcol .src{padding:8px 0 0}
+  .mcol .blk-note{padding:2px 0 8px}
+  .mcol .brank{padding:8px 0 2px}
+  .mcol .brow{grid-template-columns:22px minmax(0,1fr) 82px 58px;gap:8px}
+  .mcol .tkh{margin:10px 0 5px}
+  .mcol .tkpts{margin:10px 0 4px}
+  .mcol #nb-body{padding:10px 12px}
+  .mcol .nbrow .lb{gap:5px}
+  /* 今日资金净流入(行业 Top10) */
+  #netin-body{padding:2px 0 6px}
+  .nirow{display:grid;grid-template-columns:22px minmax(0,1fr) auto 58px;gap:8px;align-items:center;padding:6.5px 0;border-bottom:1px dashed #16202c}
+  .nirow:last-child{border-bottom:none}
+  .nirow .t{font-weight:600;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .nirow .a,.nirow .c{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .nirow .a{font:600 12px/1 var(--mono)} .nirow .c{font:500 11px/1 var(--mono)}
+
+  /* ② 板块行情 · 行业资金榜(圆形序号 + 主力净额 + 涨跌幅) */
+  .brank{padding:12px 16px 2px}
+  .brow{display:grid;grid-template-columns:22px minmax(0,1fr) 96px 72px;align-items:center;gap:10px;padding:7px 0;border-bottom:1px dashed #16202c;min-width:0}
+  .brow:last-child{border-bottom:none}
+  .rk{font:600 10.5px/1 var(--mono);width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#161d28;color:var(--ink-2)}
+  .rk.g1{background:#3a2f10;color:#ffd25e;box-shadow:0 0 8px -2px #ffd25e66}
+  .rk.g2{background:#242d38;color:#cbd5e1}
+  .rk.g3{background:#33231a;color:#e0a172}
+  .bn{min-width:0;display:flex;align-items:baseline;gap:8px}
+  .bz .rsn{color:#8fb0d8;text-decoration:none}  .bz .rsn:hover{text-decoration:underline}
+  .bz{grid-column:2/-1;margin-top:3px;font-size:10.5px;line-height:1.4;color:#5f6f80;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .bn .tt{font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .bn .pp{font:400 10px/1 var(--mono);color:var(--ink-2);white-space:nowrap}
+  .n1,.n2{text-align:right;font:600 12.5px/1 var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+  .brow.bhead{padding:0 0 7px;border-bottom:1px solid var(--border);font:500 10px/1 var(--mono);color:var(--ink-2);letter-spacing:.06em}
+  .bseg{display:flex;align-items:center;gap:6px;margin:9px 0 1px;font:600 10px/1 var(--mono);letter-spacing:.1em;color:#9fb0c2}
+  .bseg b{width:6px;height:6px;border-radius:2px}
+  .bseg .u{background:#58d68d;box-shadow:0 0 6px #58d68d66} .bseg .d{background:#ff6b6b;box-shadow:0 0 6px #ff6b6b66}
+  .brow.bhead .n1,.brow.bhead .n2{font:500 10px/1 var(--mono);color:var(--ink-2)}
+
+  /* ③ 今日机会 · 两派(v3 精修):蓝/金学派列头 + 分数环卡 + 圆点指标芯片;
+     价值派=主题蓝、趋势派=琥珀金(避红绿,不与涨跌语义打架);<1180px 两派合一列 */
+  .schools{display:grid;gap:0;padding:2px 18px}
+  @media(min-width:1180px){.schools{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
+  .school{min-width:0;padding:10px 0 4px}
+  @media(min-width:1180px){.school+.school{border-left:1px solid var(--border);padding-left:18px}}
+  @media(max-width:1179px){.school+.school{border-top:1px solid var(--border)}}
+  .school.value{--acc:#4f8cff;--acc-2:#7fb0ff}
+  .school.trend{--acc:#e8b45a;--acc-2:#f0c987}
+  .sch-h{padding:9px 12px;border:1px solid var(--border);border-left:3px solid var(--acc);border-radius:10px;background:linear-gradient(90deg,#101825,#0c1119 72%)}
+  .sch-h .t{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:650;color:var(--ink)}
+  .sch-h .t .dot{flex:none;width:7px;height:7px;border-radius:50%;background:var(--acc);box-shadow:0 0 9px var(--acc)}
+  .sch-h .t .en{margin-left:auto;font:400 9px/1 var(--mono);letter-spacing:.16em;color:#3d4c60}
+  .sch-h .sub{margin-top:3px;padding-left:14px;font:400 10px/1.55 var(--mono);color:var(--ink-2)}
+  .opps{display:grid;gap:9px;padding:10px 0 4px}
+  .opp{position:relative;border:1px solid var(--border);border-radius:10px;background:linear-gradient(180deg,#0e1520,#0c1119);padding:11px 12px;display:grid;grid-template-columns:36px minmax(0,1fr);transition:border-color .15s,transform .15s}
+  .opp:hover{border-color:#28394f;transform:translateY(-1px)}
+  .opp .rk{position:absolute;top:9px;right:11px;white-space:nowrap;font:600 9px/1 var(--mono);letter-spacing:.08em;color:#3d4c60}
+  /* 评分火焰:conic 进度直接裁成火苗形,半透明、色温下浓上淡,火舌摆动 + 强度循环衰减 */
+  .opp .ring{grid-row:1/3;align-self:start;position:relative;width:30px;height:36px;margin-top:2px;display:grid;place-items:center;padding-top:9px}
+  .opp .ring::before{content:"";position:absolute;inset:0;transform-origin:50% 100%;pointer-events:none;filter:blur(.6px);animation:flame 1.4s ease-in-out infinite;background:radial-gradient(ellipse 75% 58% at 50% 85%,#ffd27f 0%,#ff8a3c 32%,#ff4d3d 58%,#ff4d3d00 82%);clip-path:polygon(0 100%,18% 55%,10% 30%,38% 42%,50% 0,62% 42%,90% 30%,82% 55%,100% 100%);opacity:calc(.3 + var(--p)*.004)}
+  .opp .ring b{position:relative;display:grid;place-items:center;width:20px;height:20px;border-radius:50%;background:#0d131ccc;font:700 9.5px/1 var(--mono);color:#ff7a5c}
+  @keyframes flame{0%{transform:scale(1,.94) rotate(-2.5deg);filter:blur(.6px) brightness(1)}30%{transform:scale(.9,1.08) rotate(2deg);filter:blur(.6px) brightness(.9)}60%{transform:scale(.82,.96) rotate(-1.5deg);filter:blur(.7px) brightness(.75)}100%{transform:scale(.7,.78) rotate(0);filter:blur(.9px) brightness(.55)}}
+  .opp .h{grid-column:2;display:flex;align-items:baseline;gap:8px;min-width:0;padding-right:34px}
+  .opp .nm{font-weight:650;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .opp .code{font:400 10.5px/1 var(--mono);color:var(--ink-2)}
-  .opp .tags{display:flex;gap:5px;flex-wrap:wrap;margin-top:2px}
-  .opp .tag{font:600 10px/1 var(--mono);padding:3.5px 7px;border-radius:99px;letter-spacing:.03em}
-  .opp .why{margin-top:5px;grid-column:2;font:400 11px/1.6 var(--mono);color:var(--ink-2)}
-  .oppnote{padding:2px 18px 12px;font:400 10.5px/1.6 var(--mono);color:var(--ink-2)}
+  .opp .pp{margin-left:auto;font:600 12px/1 var(--mono);white-space:nowrap}
+  .opp .chips{grid-column:2;display:flex;flex-wrap:wrap;gap:5px;margin-top:7px}
+  .opp .chip{display:inline-flex;align-items:center;gap:5px;padding:3.5px 8px;border:1px solid #1a2433;border-radius:7px;background:#0f1722;font:400 10.5px/1.35 var(--mono);color:var(--ink-2);white-space:nowrap}
+  .opp .chip i{flex:none;width:5px;height:5px;border-radius:50%;border:1px solid #55677e}
+  .opp .chip b{font-weight:600;color:var(--ink-2)}
+  .opp .chip.on{border-color:#22324a;background:#111b29;color:#9fb0c2}
+  .opp .chip.on i{border-color:var(--acc);background:var(--acc);box-shadow:0 0 5px var(--acc)}
+  .opp .chip.on b{color:var(--acc-2)}
+  .opp .mt{font:400 10.5px/1 var(--mono);color:var(--ink-2);white-space:nowrap;min-width:0;overflow:hidden;text-overflow:ellipsis}
+  .opp .mt .px{color:#9fb0c2;font-weight:600}
+  .opps .err{border:1px dashed #232f3f;border-radius:9px;padding:13px 14px;font:400 11px/1.7 var(--mono)}
+  .schools .blk-note{padding:2px 0 8px}
+  .oppnote{margin:4px 18px 0;padding:9px 0 2px;border-top:1px solid #131c27;font:400 10.5px/1.7 var(--mono);color:var(--ink-2)}
+  .oppnote em{color:#ffd25e;font-style:normal}
 
-  /* ④ 资金 与 异动:紧凑竖排小榜(每行 .r 满宽,行间留隙) */
-  .minir{display:flex;flex-direction:column;gap:6px;padding:3px 0;font-size:12px}
-  .minir .r{display:flex;align-items:center;gap:8px;min-width:0}
-  .minir .n{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .minir .r .lb{font:600 9.5px/1 var(--mono);color:#ffd25e;border:1px solid #4a3c1e;border-radius:99px;padding:2.5px 5px;flex:none}
-  .minir .r .in{font:400 10px/1 var(--mono);color:var(--ink-2);flex:none}
-  .minir .r .num{margin-left:auto;font-family:var(--mono);white-space:nowrap}
+  /* 基金观察表:抄币圈现货表规格(数字右对齐 mono、首列左对齐名称、分隔线 #151c26、行无内框) */
+  .ftab{width:100%;border-collapse:collapse;font-size:13px}
+  .ftab th{text-align:right;font:500 11px/1 var(--mono);letter-spacing:.05em;color:var(--ink-2);padding:10px 18px;border-bottom:1px solid var(--border);white-space:nowrap}
+  .ftab th:first-child,.ftab td:first-child{text-align:left}
+  .ftab td{padding:10px 18px;border-bottom:1px solid #151c26;text-align:right;white-space:nowrap;font-family:var(--mono);font-variant-numeric:tabular-nums}
+  .ftab tr:last-child td{border-bottom:none}
+  .ftab td.nm{color:var(--ink);font-weight:600;max-width:190px;overflow:hidden;text-overflow:ellipsis}
+  .ftab .fx{font:400 9px/1 var(--mono);border:1px solid var(--border);border-radius:4px;padding:2px 4px;margin-left:6px;color:var(--ink-2);font-weight:400}
+  .ftab .fx.on{color:#7fb0ff;border-color:#1d2d44;background:#13223866}
+  .ftab .xi{font-size:9.5px;color:var(--ink-2);margin-left:4px;font-weight:400}
+  .tscroll{overflow-x:auto;-webkit-overflow-scrolling:touch} /* 窄屏基金表内横滑,≤900 首列吸附规格在 theme.css */
+
+  /* ⑥ 市场异动:三张擂台小卡 —— 名次圆牌(前三金/银/铜,复用 .rk)+ 徽标 + 名称 + 右对齐百分比 */
+  #moves-body{padding:4px 14px 14px;display:grid;gap:12px}
+  .mvcard{border:1px solid var(--border);border-radius:12px;background:linear-gradient(180deg,#101826,#0d131c);padding:6px 13px 8px;min-width:0}
+  /* 连板/放量榜折叠下拉(2026-09-22):收起只露 TOP1,整张卡头行可点,▾ 随开合转 */
+  .mvcard summary{list-style:none;cursor:pointer}
+  .mvcard summary::-webkit-details-marker{display:none}
+  .mvcard summary:hover .mvh{color:var(--asset)}
+  .mvcard .ca{display:inline-block;font-style:normal;transition:transform .18s}
+  .mvcard[open] .ca{transform:rotate(180deg)}
+  .mvh{display:flex;align-items:baseline;gap:8px;font:600 11px/1 var(--mono);letter-spacing:.1em;color:#a7b6c8;margin:6px 1px 2px}
+  .mvh b{margin-left:auto;font:400 9.5px/1 var(--mono);color:#3c4c61;letter-spacing:.04em}
+  .mrow{display:flex;flex-wrap:wrap;align-items:center;gap:3px 9px;padding:7px 0 6px;border-bottom:1px dashed #16202c;font-size:12.5px;min-width:0}
+  .mrow:last-child{border-bottom:none}
+  /* 能量条:连板绿格子(一格一板,涨=绿全站统一);跌幅绿条/量比蓝条按列内最大值归一 */
+  .mrow .ebar{flex:none;width:var(--w);height:4px;border-radius:2px;margin:-1px 0 1px}
+  .mrow .ebar.r{background:linear-gradient(90deg,#8a2f38,#ff6b6b);box-shadow:0 0 5px #ff6b6b33}
+  .mrow .ebar.b{background:linear-gradient(90deg,#274a7a,#4f8cff);box-shadow:0 0 5px #4f8cff33}
+  .ecells{flex:none;display:inline-flex;align-items:center;gap:2px}
+  .ecells i{width:6px;height:13px;border-radius:1.5px;background:linear-gradient(#8be2b0,#2c9e63);box-shadow:0 0 4px #58d68d55}
+  .ecells u{font:600 9.5px/1 var(--mono);color:#7fe0ac;text-decoration:none;margin-left:2px}
+  .mrow .mn{flex:1;min-width:0;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .mrow .mv{flex:none;width:66px;text-align:right;font:600 12.5px/1 var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+  .mchip{flex:none;min-width:44px;text-align:center;font:600 9.5px/1 var(--mono);padding:3.5px 6px;border-radius:5px}
+  .mchip.blue{color:#7fb0ff;background:#132238;border:1px solid #1d2d44}
+  .mvnone{padding:9px 1px 6px;font:400 11px/1.6 var(--mono);color:var(--ink-2)}
 
   /* ⑤ 资讯 */
   .news{display:grid;align-content:start;padding:2px 18px 8px}
-  .nrow{padding:11px 0;border-bottom:1px dashed #1a2330;display:grid;gap:4px}
-  .nrow:last-child{border-bottom:none}
-  .nrow .t{color:var(--ink);text-decoration:none;font-size:13px;line-height:1.5;font-weight:600}
-  .nrow .t:hover{color:var(--asset)}
-  .nrow .s{color:var(--ink-2);font:400 11px/1.6 var(--mono);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-  .nrow .m{font:400 10.5px/1 var(--mono);color:var(--ink-2);display:flex;gap:8px;align-items:center}
+  /* 资讯行改时间线编排(2026-09-20),行样式共用 theme.css .tl*;原 .nrow 系列已删 */
   .tchip{font:600 9.5px/1 var(--mono);padding:2.5px 6px;border-radius:4px;letter-spacing:.04em}
   .tc-policy{color:#7fb0ff;background:#132238} .tc-market{color:#ffd25e;background:#2a2413}
   .tc-company{color:#c8a2ff;background:#221433} .tc-news{color:#8b98a5;background:#161d28}
 
   .colh{font:500 10px/1 var(--mono);letter-spacing:.1em;color:var(--ink-2);text-transform:uppercase;margin:14px 18px 2px}
   .blk-note{padding:2px 18px 12px;font:400 10.5px/1.6 var(--mono);color:var(--ink-2)}
+  .blk-note em{color:#ffd25e;font-style:normal}
+
+  /* ②-c 北向资金动向(成交额口径;标签 | 金额 | 较前日,末行合计走上分隔线)
+     这块最容易被忽略:独立蓝光卡 + 标题呼吸点 + 行入场错峰 + 周期性扫光。纯 CSS,无新数据 */
+  #nb-body{display:grid;position:relative;overflow:hidden;background:linear-gradient(160deg,#0e1b2e,#0c131e 70%);border:1px solid #1d3050;border-radius:12px;padding:10px 14px;box-shadow:inset 0 0 26px #1d4ed818}
+  #nb-body::before{content:"";position:absolute;top:0;bottom:0;left:-45%;width:40%;background:linear-gradient(100deg,transparent,#4f8cff22,transparent);animation:nbsweep 6s ease-in-out 1.2s infinite;pointer-events:none}
+  @keyframes nbsweep{0%{left:-45%}45%,100%{left:120%}}
+  #nb-body .err{padding:6px 2px}
+  .colh.nbh{display:flex;align-items:center;gap:8px;color:#7fb0ff;font-weight:600;margin-bottom:10px}
+  .colh.nbh::before{content:"";flex:none;width:7px;height:7px;border-radius:50%;background:var(--asset);animation:nbpulse 2.2s ease-out infinite}
+  @keyframes nbpulse{0%{box-shadow:0 0 0 0 #4f8cffaa}70%{box-shadow:0 0 0 7px #4f8cff00}100%{box-shadow:0 0 0 0 #4f8cff00}}
+  #nb-body .nbrow{opacity:0;animation:nbin .5s cubic-bezier(.2,.7,.3,1) forwards}
+  #nb-body .nbrow:nth-child(1){animation-delay:.08s}
+  #nb-body .nbrow:nth-child(2){animation-delay:.2s}
+  #nb-body .nbrow:nth-child(3){animation-delay:.34s}
+  @keyframes nbin{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
+  @media(prefers-reduced-motion:reduce){#nb-body::before,.colh.nbh::before,#nb-body .nbrow{animation:none;opacity:1}.opp .ring::before{animation:none}}
+  .nbrow{display:grid;grid-template-columns:minmax(0,1fr) auto 64px;align-items:center;gap:10px;padding:8.5px 0;border-bottom:1px dashed #16202c;min-width:0}
+  .nbrow:last-child{border-bottom:none}
+  .nbrow .lb{display:flex;align-items:center;gap:7px;min-width:0}
+  .nbic{flex:none;width:18px;height:18px;border-radius:5px;display:flex;align-items:center;justify-content:center;font:600 10px/1 var(--sans);font-style:normal;color:#7fb0ff;background:#132238;border:1px solid #1d2d44}
+  .nbrow .nm{font:500 12px/1 var(--mono);color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .nbrow .v{font:600 13px/1 var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap;text-align:right}
+  .nbrow .p{font:500 11px/1 var(--mono);white-space:nowrap;text-align:right}
+  .nbrow.tot{border-top:1px solid var(--border);margin-top:3px;padding-top:10px}
+  .nbrow.tot .nm{font-weight:600}
+
+  /* 手机适配(≤640):窄屏列表固定 px 列收紧,名称列多留空间 */
+  @media(max-width:640px){
+    .mkt-hero{padding:16px 14px 4px}
+    .mktstrip{gap:8px}
+    .idxrow{padding:13px 14px 0}
+    .idx{padding:12px 13px}
+    .ms{padding:9px 11px;gap:5px}
+    .ms .v{font-size:15px}
+    .d7{padding-left:12px;padding-right:12px}
+    .tkh{margin:10px 12px 5px}
+    .tkpts{grid-template-columns:1fr;margin:10px 12px 4px}
+    .tk{padding:9px 12px}
+    .src{padding:10px 14px 0}
+    .schools{padding-left:12px;padding-right:12px}
+    .oppnote{margin-left:12px;margin-right:12px}
+    .colh,.blk-note{padding-left:12px;padding-right:12px}
+    .ftab th,.ftab td{padding:9px 10px}
+    .ftab th:nth-child(2),.ftab td:nth-child(2){padding-right:4px}
+    .ftab td.nm{max-width:118px}
+    .brank{padding:10px 12px 2px}
+    .brow{grid-template-columns:20px minmax(0,1fr) auto auto;gap:8px 10px;padding:8px 0}
+    .brow.bhead{display:none}
+    .bn{display:grid;justify-items:start;gap:2px}
+    .bn .tt{font-size:12.5px}
+    .n1,.n2{font-size:12px}
+    #nb-body{padding:9px 11px}
+    /* ③ 机会卡:现价/行业挤到第二行,名字不再被截断 */
+    .opp .h{flex-wrap:wrap;row-gap:4px}
+    .opp .mt{flex:1 1 100%;order:5}
+  }
 </style>
 </head>
 <body>
@@ -93,8 +283,8 @@
   <div class="brand"><span class="dot"></span><h1>大A股票</h1></div>
   <nav>
     <a href="hub.html">总览</a>
-    <a href="stock.html">A股</a>
     <a href="crypto.html">币圈</a>
+    <a href="stock.html">A股</a>
     <a href="dashboard.html">我的财富<span class="lk">🔒</span></a>
     <a href="cashflow.html">流水<span class="lk">🔒</span></a>
     <a href="holdings.html">持仓<span class="lk">🔒</span></a>
@@ -107,35 +297,75 @@
 <main>
   <!-- ① 市场概况 -->
   <section class="panel" id="p-mkt">
-    <div class="phead"><div class="eyebrow">指数 · 涨跌家数 · 涨停跌停 · 两市成交</div><h2>市场概况</h2></div>
+    <div class="phead mkt-hero">
+      <div class="mh-left">
+        <div class="mh-tag">A股</div>
+        <h2>市场概况</h2>
+        <div class="mh-sub">指数 · 涨跌家数 · 涨停跌停 · 两市成交,一图看清盘面资金</div>
+        <div class="mh-meta" id="mh-meta"></div>
+      </div>
+      <div class="mktstrip" id="mktstrip"></div>
+    </div>
     <div class="src" id="src-mkt"></div>
     <div class="idxrow" id="idxrow"></div>
-    <div class="mktstrip" id="mktstrip"></div>
   </section>
 
-  <!-- ② 板块行情 + ③ 今日机会 -->
-  <div class="grid2">
-    <section class="panel" id="p-boards">
-      <div class="phead"><div class="eyebrow">行业板块 · 当日</div><h2>板块行情</h2></div>
-      <div class="src" id="src-boards"></div>
-      <div class="pillrow" id="board-pills"></div>
-      <div id="board-body"></div>
-      <div class="blk-note">热门板块 Top8,可切换排序(主力净占比为东财口径)。板块上涨≠个股都涨,需结合 ③ 机会里的个股确认。</div>
-    </section>
-    <section class="panel" id="p-opp">
-      <div class="phead"><div class="eyebrow">资金 + 趋势 + 估值 启发式筛选</div><h2>今日机会</h2></div>
-      <div class="src" id="src-opp"></div>
-      <div class="opps" id="opps"></div>
-      <div class="oppnote" id="opp-note"></div>
-    </section>
-  </div>
+  <!-- 基金观察:固定清单表格(清单 data/fund_watch.json,一行一只),版式抄币圈「现货与市值」表;成立不足3年第三收益列落成立以来 -->
+  <section class="panel" id="p-funds">
+    <div class="phead"><div class="eyebrow">固定自选 · 东财基金 · 区间涨跌=净值口径 · 今日/行情:场内=成交实时价,场外=最新净值</div><h2>基金观察</h2></div>
+    <div class="src" id="src-funds"></div>
+    <div id="funds"></div>
+    <div class="blk-note">区间收益(7日~近3年)均为东财净值口径,与场内成交价涨跌可有细微差;成立不足 3 年第三收益列显成立以来(角标「成立」),场外净值 T+1(日期角标在「今日涨跌」列)。市值/24h高低/成交额仅场内 ETF 有(场外显 —)。增删基金:编辑 data/fund_watch.json(6位代码,ex=场内 true / 场外 false)。</div>
+  </section>
 
-  <!-- ④ 市场资金 -->
-  <section class="panel" id="p-flow">
-    <div class="phead"><div class="eyebrow">涨停池主力聚焦 · 板块净流入/流出 · 连板</div><h2>市场资金</h2></div>
-    <div class="src" id="src-flow"></div>
-    <div class="grid3" id="flow-grid"></div>
-    <div class="blk-note" id="flow-note"></div>
+  <!-- ② 资金流向:三栏(行业榜 | 趋势+要点 | 净流入榜+北向),布局参考「市场观察」 -->
+  <section class="panel" id="p-boards">
+    <div class="phead"><div class="eyebrow">行业分布 · 分时趋势 · 资金要点 · 北向成交</div><h2>板块行情</h2></div>
+    <div class="mgrid">
+      <div class="mcol">
+        <div class="colh">资金流向行业分布 · 涨幅 Top4 + 跌幅 Top4</div>
+        <div class="src" id="src-boards"></div>
+        <div id="board-body"></div>
+        <div class="blk-note" id="board-note"></div>
+      </div>
+      <div class="mcol">
+        <div class="colh">资金流向趋势 · 近 7 日折线(主力净额 + 沪深成交额)</div>
+        <div class="src" id="src-trend"></div>
+        <div id="trend-body"></div>
+        <div class="tkpts" id="trend-points"></div>
+        <div class="blk-note" id="trend-note">上折线 = 近 7 个交易日主力净额(上证+深证成指合计,东财;时通时断期间由本地台账多路并试攒数,官方日线恢复自动回填整段)。下折线 = 沪深两市成交额逐日(东财官方日K回填 + 腾讯行情记当日,首个点起隔日成线)。北向净买入自 2024-08 官方停发,要点卡与右榜用仍每日发布的成交额(T-1)。</div>
+      </div>
+      <div class="mcol">
+        <div class="colh">今日资金净流入 · 行业 Top10</div>
+        <div id="netin-body"></div>
+        <div class="colh nbh">北向资金动向 · 成交额(T-1 收盘)</div>
+        <div id="nb-body"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ③ 今日机会 · 两派(v2):价值=基本面(MX),趋势=量价形态(本地算) -->
+  <section class="panel" id="p-opp">
+    <div class="phead"><div class="eyebrow">同一池股票,两种眼光 · 价值找被错杀的好公司,趋势只骑已在走的主升</div><h2>今日机会</h2></div>
+    <div class="src" id="src-opp"></div>
+    <div class="schools">
+      <div class="school value">
+        <div class="sch-h">
+          <div class="t"><span class="dot"></span>价值投资派 · 好公司 + 坏价格<span class="en">VALUE</span></div>
+          <div class="sub">质地40 + 估值30 + 错杀30 · 着重错杀(52周高点回撤) · 每小时更新</div>
+        </div>
+        <div class="opps" id="value-list"></div>
+      </div>
+      <div class="school trend">
+        <div class="sch-h">
+          <div class="t"><span class="dot"></span>趋势投资派 · 只做在走的趋势<span class="en">TREND</span></div>
+          <div class="sub">四项硬门槛:MA5&gt;10&gt;20&gt;60↑ · 站稳MA20 · 量5÷60&gt;1.5 · RSI∈[50,70] · 宁缺毋滥</div>
+        </div>
+        <div class="opps" id="trend-list"></div>
+        <div class="blk-note" id="trend-sub"></div>
+      </div>
+    </div>
+    <div class="oppnote" id="opp-note">口径:价值派=妙想MX基本面语义选股(连续5年ROE&gt;15%/毛利率&gt;30%/扣非连增/股息率/PE/PB/52周高点回撤),选出后另过腾讯日K「企稳回升」硬确认(站回MA20 且近20日涨幅&gt;0),每小时更新一次;趋势派=东财全A候选粗筛后拉腾讯前复权日K本地算 MA/MACD/RSI/量能,宁缺毋滥。chip <em>亮色圆点=达标、空心灰点=未达标、不显示=源缺该字段</em>;分数环为服务端 0~100 评分(≥65 金环)。<em>免费源覆盖不到、未纳入判定</em>:商誉/大股东质押/审计意见/应收增速四项一票否决、PE与PB近5年分位(按绝对值近似)、PEG、卖方一致预期、增持回购、板块20日涨幅与「板块内≥3只创60日新高」(以同行业入选≥2只+当日板块涨幅为代理);银行/地产/公用事业的负债率豁免未做。启发式筛选,非投资建议。</div>
   </section>
 
   <!-- ⑤ 重要资讯 + ⑥ 市场异动 -->
@@ -152,9 +382,10 @@
     </section>
   </div>
 
-  <p class="foot">数据源(免 key):指数行情/成交额来自腾讯 qt,涨跌家数、行业板块、涨停池、全A 排行与资讯来自东方财富公开接口;服务端缓存 60s。A股惯例红涨绿跌。「今日机会」为仅基于涨跌幅/主力净流入/换手/量比/PE/PB 的启发式评分(Top6,剔涨停与过热),评分权重见卡片下注记——它只回答「今天资金与动量选了谁」,不含业绩/ROE/股息率、北向(官方停发)与逐笔,非投资建议。东方财富接口对本网络偶发限流,失败会在对应卡片标 ✗,过 1-2 分钟刷新即恢复;资讯「政策/市场/公司」标签仅为关键词粗分,非精准影响对象。妙想选股等增强源留待后续。</p>
+  <p class="foot">数据源(免 key):指数行情/成交额来自腾讯 qt,涨跌家数、行业板块、涨停池、全A 排行与资讯来自东方财富公开接口;服务端缓存 60s。涨跌配色全站统一绿涨红跌。「今日机会」分两派:价值派走妙想 MX 基本面选股(免费基本面唯一源,盘中每小时一刷,东财不可用时资讯/机会兜底同理),趋势派由东财全A候选 + 腾讯日K 在服务端本地计算 MA/MACD/RSI/量能(腾讯行情走直连,不受东财限流影响);两派均为启发式评分,免费源覆盖不到的项(一票否决四项、5年估值分位、板块20日涨幅等)已在③卡注记列明,非投资建议。两市主力净额分时/日线取自东财 fflow 接口(深市经延迟镜像,日线仅沪市)。东方财富接口对本网络偶发限流,失败会在对应卡片标 ✗,过 1-2 分钟刷新即恢复;资讯「政策/市场/公司」标签仅为关键词粗分,非精准影响对象。妙想选股等增强源留待后续。</p>
 </main>
-<script src="nav.js"></script>
-<script src="stock.js"></script>
+<script src="nav.js?v=20260921a"></script>
+<script src="stock.js?v=20260922f"></script>
+<script src="stats.js?v=20260920d"></script>
 </body>
 </html>

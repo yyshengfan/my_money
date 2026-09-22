@@ -10,6 +10,7 @@ import { Inject, Controller, Get, Post, Body, ALL } from '@midwayjs/core';
 import { Context } from '@midwayjs/koa';
 import { MoneyService } from '../service/money.service';
 import { MoneyDTO } from '../dto/money.dto';
+import { demoMoneyList } from '../service/demo';
 
 @Controller('/money')
 export class APIController {
@@ -19,15 +20,22 @@ export class APIController {
   @Inject()
   moneyService: MoneyService;
 
+  // 演示账号(tianhui 之外):只读假数据,记账写入直接拒
+  private get isDemo(): boolean {
+    return !!(this.ctx as any).session?.user?.demo;
+  }
+
   @Post('/create')
   async getUser(@Body(ALL) params: MoneyDTO) {
+    if (this.isDemo)
+      return { success: false, message: '演示账号为只读示例数据,不支持记账', data: null };
     const res = await this.moneyService.createNew(params);
     return { success: true, message: 'OK', data: res };
   }
 
   @Get('/list')
   async list() {
-    const res = await this.moneyService.findAll();
+    const res = this.isDemo ? demoMoneyList() : await this.moneyService.findAll();
     return { success: true, message: 'OK', data: res };
   }
 }

@@ -4,7 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>投资雷达</title>
-<link rel="stylesheet" href="theme.css">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="stylesheet" href="theme.css?v=20260921a">
 <style>
   /* 首页私有样式(令牌见 theme.css)。总览页为跨市场雷达:统一配色便于一眼对比。
      A股小列/币圈小列仍各按本市场习惯着色,戳进对应雷达页颜色一致。 */
@@ -17,69 +18,69 @@
   .rowhead .go:hover{text-decoration:underline}
   h2{font-size:15px}
 
-  /* ① MARKET PULSE → 「市场大盘」一带(参考图风):左 标题+时间 / 中 3 大 A股指数大数字 / 右 市值分布圆环 */
-  .pulse{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:22px 30px;align-items:center;padding:22px 26px;position:relative;overflow:hidden;
-    background:linear-gradient(120deg,#0a1830 0%,#10151c 62%,#10151c 100%);border-color:#1b2d4d}
-  .pulse::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.6;
-    background:radial-gradient(620px 150px at 6% -30%,rgba(43,132,253,.16),transparent 60%)}
-  .pulse::after{content:"";position:absolute;top:0;left:0;right:0;height:1px;
-    background:linear-gradient(90deg,transparent,rgba(84,165,255,.75),rgba(43,132,253,.75),transparent)}
-  @media(max-width:1300px){.pulse{grid-template-columns:1fr;gap:18px}}
-  .pulse .eyebrow{color:#6f9fd8}
-  .pl{min-width:0;position:relative;z-index:1}
-  .hl{font-size:clamp(23px,2.9vw,32px);font-weight:700;letter-spacing:.02em;line-height:1.25;margin-top:11px;color:#fff;
-    text-shadow:0 0 24px rgba(84,165,255,.28);white-space:nowrap}
-  .pulse .hd{font-size:13px;color:#9fb0c6;line-height:1.7;margin-top:9px}
-  .pulse .meta{font:400 11px/1.7 var(--mono);color:#6f839c;margin-top:12px}
-  .pulse .meta b{color:#8fa8c6;font-weight:600}
+  /* ① 全球市场·宏观(2026-09-20 总览改版照参考图):左 KPI 磁贴+统计条 / 右 主要资产 30 日归一多线走势 */
+  .gmk .mnote{margin-left:auto;font:400 10px/1.6 var(--mono);color:#5c6b80;letter-spacing:.03em;text-align:right}
+  .gwrap{display:grid;grid-template-columns:minmax(0,1.12fr) minmax(0,1fr)}
+  .gleft{min-width:0;padding:6px 18px 14px;display:grid;gap:12px;align-content:start}
+  .gts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1px solid var(--border);border-radius:10px;overflow:hidden}
+  .gt{padding:10px 12px 11px;min-width:0;border-left:1px dashed #17202c;border-top:1px dashed #17202c}
+  .gt .nm{font:500 10px/1 var(--mono);letter-spacing:.1em;color:#8fa3bd;white-space:nowrap;display:block}
+  .gt b{display:block;font:700 clamp(15px,1.6vw,18px)/1.2 var(--mono);color:#f2f6fb;margin-top:6px;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .gt .ch{font:600 10.5px/1 var(--mono);margin-top:4px;display:block;white-space:nowrap}
+  @media(min-width:641px){.gt:nth-child(4n+1){border-left:0}.gt:nth-child(-n+4){border-top:0}}
+  .gstats{display:flex;flex-wrap:wrap;border:1px solid var(--border);border-radius:10px;padding:4px 0}
+  .gs{flex:1 1 max-content;min-width:0;padding:8px 12px} /* 按内容撑开、放不下换行 —— 641~1100 中间带五格强挤一行会把字出框(2026-09-20 用户抓包) */
+  .gs+.gs{border-left:1px dashed #17202c}
+  .gs .k{font:500 10px/1 var(--mono);color:var(--ink-2);letter-spacing:.06em;display:block;white-space:nowrap}
+  .gs .v{font:700 14.5px/1.1 var(--mono);margin-top:6px;display:inline-block;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .gs .v small{font-size:10.5px;font-weight:600;margin-left:5px}
+  .fbar{position:relative;height:6px;border-radius:3px;margin-top:9px;background:linear-gradient(90deg,#e0524e,#ffd27f,#2ecc71)}
+  .fbar i{position:absolute;top:-4px;left:50%;width:3px;height:14px;background:#fff;border-radius:2px;transform:translateX(-50%);box-shadow:0 0 8px rgba(255,255,255,.5)}
+  .gstats .mtemp{margin-top:0;align-items:center;flex:1 1 max-content;white-space:nowrap} /* 环格按内容撑开,任何宽度不把文字挤出虚线框 */
+  .gright{border-left:1px dashed #17202c;padding:12px 18px 14px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 14px;align-content:start;min-width:0}
+  .gright .cap{grid-column:1/-1;font:600 10px/1 var(--mono);letter-spacing:.12em;color:#6f9fd8;margin-bottom:4px}
+  #gk-chart{display:block;width:100%;height:158px}
+  /* 悬停识别折线(2026-09-20 用户要求):透明宽描边当热区,悬停高亮本线压暗其余,<title> 出原生提示 */
+  #gk-chart .ln{fill:none;stroke-width:1.4;stroke-linejoin:round;pointer-events:none;transition:opacity .12s,stroke-width .12s}
+  #gk-chart .hit{fill:none;stroke:transparent;stroke-width:10px;stroke-linejoin:round;pointer-events:stroke;cursor:crosshair}
+  #gk-chart:hover .ln{opacity:.25}
+  #gk-chart .lg:hover .ln{opacity:1;stroke-width:2.6}
+  .glg{display:grid;gap:9px;align-content:center;min-width:108px}
+  .glg span{font:500 10.5px/1.2 var(--mono);color:#93a6bf;display:flex;align-items:center;gap:6px;white-space:nowrap}
+  .glg i{width:10px;height:2px;border-radius:1px;flex:none}
+  .glg b{margin-left:auto;font-weight:700;color:#cdd7e3;font-variant-numeric:tabular-nums;min-width:52px;text-align:right}
+  @media(max-width:1100px){.gwrap{grid-template-columns:1fr}.gright{border-left:0;border-top:1px dashed #17202c}}
 
-  /* A股指数大数字列 */
-  .pix{display:grid;grid-template-columns:repeat(3,auto);gap:0 6px;align-items:center;position:relative;z-index:1;
-    border-left:1px solid #1b2d4d;padding-left:24px}
-  @media(max-width:1300px){.pix{border-left:0;padding-left:0;border-top:1px solid #1b2d4d;padding-top:16px;justify-content:space-between;grid-template-columns:repeat(3,minmax(0,1fr))}}
-  .ix{display:flex;flex-direction:column;gap:7px;padding:0 13px;min-width:0}
-  @media(max-width:1300px){.ix{padding:0 8px}}
-  .ix+.ix{border-left:1px dashed #1c2c47}
-  .ix .nm{font:500 11px/1 var(--mono);color:#8fa3bd;letter-spacing:.08em;white-space:nowrap}
-  .ix b{font:700 clamp(20px,2.5vw,28px)/1 var(--mono);color:#f2f6fb;font-variant-numeric:tabular-nums;text-shadow:0 0 18px rgba(120,170,255,.18)}
-  .ix .ch{font:600 12px/1 var(--mono)}
+  /* ② A股|币圈 双面板(2026-09-20 改版):大卡(走势面积图)+次级读数行+热门 chips */
+  .pad{padding:12px 18px 16px;display:grid;gap:12px;align-content:start}
+  .bigrow{display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:10px}
+  .bigc{border:1px solid var(--border);border-radius:10px;background:#0d131c;padding:11px 13px 4px;min-width:0;overflow:hidden}
+  .bigc .nm{font:600 11px/1 var(--mono);color:#a7b6c8;letter-spacing:.06em}
+  .bigc .pv{font:700 clamp(19px,2.2vw,24px)/1.15 var(--mono);margin-top:7px;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .bigc .ch{font:600 11.5px/1 var(--mono);margin-top:5px;display:inline-block;white-space:nowrap}
+  .bigc svg{display:block;width:100%;height:40px;margin-top:4px}
+  .minis{display:flex;flex-wrap:wrap}
+  .mini{flex:1 1 25%;min-width:0;padding:2px 10px}
+  .mini+.mini{border-left:1px dashed #17202c}
+  .mini .nm{font:500 10px/1 var(--mono);color:var(--ink-2);display:block;white-space:nowrap}
+  .mini b{font:600 13px/1 var(--mono);display:block;margin-top:6px;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .mini .ch{font:500 10px/1 var(--mono);margin-top:5px;display:block;white-space:nowrap}
+  .kvs{display:flex}
+  .kv{flex:1;min-width:0;padding:2px 12px}
+  .kv+.kv{border-left:1px dashed #17202c}
+  .kv .k{font:500 10px/1 var(--mono);color:var(--ink-2);letter-spacing:.05em;display:block;white-space:nowrap}
+  .kv .v{font:700 15px/1 var(--mono);margin-top:6px;display:inline-block;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .kv .v small{font-size:10px;font-weight:600;margin-left:5px}
+  .udbar{height:6px;border-radius:3px;margin-top:8px;background:#2ecc71;position:relative;overflow:hidden}
+  .udbar s{position:absolute;right:0;top:0;bottom:0;background:#ff6b6b}
+  .lbl{font:500 10px/1 var(--mono);color:var(--ink-2);letter-spacing:.05em}
+  .chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:7px}
+  .chip{border:1px solid var(--border);border-radius:99px;padding:5px 10px;font:600 11px/1 var(--mono);display:flex;gap:7px;align-items:center;white-space:nowrap}
+  .chip .nm{color:#cdd7e3}
 
-  /* 市值分布圆环卡 */
-  .pc{display:flex;flex-direction:column;align-items:center;position:relative;z-index:1;border-left:1px solid #1b2d4d;padding-left:24px}
-  @media(max-width:1300px){.pc{border-left:0;padding-left:0;border-top:1px solid #1b2d4d;padding-top:16px}}
-  .capT{font:600 10px/1 var(--mono);letter-spacing:.16em;color:#6f9fd8;margin-bottom:11px;text-transform:uppercase}
-  .cwrap{position:relative;width:128px;height:128px}
-  .cdonut{position:absolute;inset:0;border-radius:50%;
-    -webkit-mask:radial-gradient(circle,transparent 68%,#000 69%);mask:radial-gradient(circle,transparent 68%,#000 69%)}
-  .cwrap b{position:absolute;inset:0;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px}
-  .cwrap b em{font:700 20px/1 var(--mono);font-style:normal;color:#fff;text-shadow:0 0 16px rgba(84,165,255,.35)}
-  .cwrap b small{font:400 9.5px/1 var(--mono);color:#6f839c;letter-spacing:.12em}
-  .lg{display:flex;flex-wrap:wrap;gap:5px 11px;justify-content:center;margin-top:11px;max-width:300px}
-  .lg span{font:600 10px/1.4 var(--mono);color:#93a6bf;display:flex;align-items:center;gap:4px}
-  .lg i{width:6px;height:6px;border-radius:50%;flex:none;display:inline-block}
-
-  /* 行情列:大字行情行 */
-  .mkt .inner{padding:8px 0 2px}
-  .qrow{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:14px;align-items:baseline;padding:11px 18px}
-  .qrow+.qrow{border-top:1px dashed #151e29}
-  .qrow .nm{font-weight:600;font-size:13.5px;display:flex;align-items:baseline;gap:8px;min-width:0}
-  .qrow .nm .sym{font:400 10px/1 var(--mono);color:var(--ink-2)}
-  .qrow .pv{font:600 clamp(17px,2vw,22px)/1 var(--mono);text-align:right}
-  .qrow .ch{font:600 12.5px/1 var(--mono);text-align:right;min-width:74px}
-  .strip{display:flex;flex-wrap:wrap;gap:0;border-top:1px solid var(--border);margin-top:6px}
-  .sb{padding:11px 18px;min-width:92px}
-  .sb .k{font:400 10px/1 var(--mono);color:var(--ink-2);letter-spacing:.05em}
-  .sb .v{font:600 14.5px/1 var(--mono);margin-top:6px;display:block}
-
-  /* A股面板细项(三大指数已在 hero,此处放全市场派生读数) */
-  .astats{display:grid;gap:0;padding:4px 0 6px}
-  .srow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:baseline;padding:12px 18px}
-  .srow+.srow{border-top:1px dashed #151e29}
-  .srow .k{font:500 12px/1 var(--sans);color:var(--ink-2);letter-spacing:.02em}
-  .srow .v{font:700 13.5px/1 var(--mono);text-align:right}
-
-  /* 今日信号 */
-  .sigs{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px;padding:14px 18px 16px}
+  /* 今日信号(现挂在板块①末尾):gcap 小节题沿用 .gright .cap 的 mono 蓝签语系,虚线分隔同 gwrap 内 */
+  .gcap{font:600 10px/1 var(--mono);letter-spacing:.12em;color:#6f9fd8;border-top:1px dashed #17202c;padding:13px 18px 0}
+  .sigs{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px;padding:11px 18px 16px}
   .sig{border:1px solid var(--border);border-radius:9px;background:#0d131c;padding:12px 13px;display:grid;grid-template-columns:auto 1fr;gap:4px 11px;align-items:start}
   .sig .dot{font-size:15px;line-height:1.4}
   .sig .lead{font-weight:600;font-size:13px;line-height:1.45}
@@ -92,14 +93,175 @@
   .opprow+.opprow{border-top:1px dashed #151e29}
   .opprow .rk{font:600 12px/1 var(--mono);color:var(--ink-2)}
   .opprow .nm{font-weight:600;font-size:13px;display:flex;align-items:center;gap:8px;min-width:0}
+  .opprow>.nm:first-child{grid-column:1/-1} /* 空状态/提示行没有 .rk 序号,不跨列会被挤进 26px 列宽竖排出框 */
   .opprow .nm .sc{font:600 9.5px/1 var(--mono);color:#ffd25e;background:#2a2413;border-radius:99px;padding:3px 6px;letter-spacing:.03em}
   .opprow .nm .sc.hi{background:#3a2f10}
   .opprow .why{grid-column:2;font:400 10.5px/1.6 var(--mono);color:var(--ink-2);margin-top:1px}
   .opprow .v{font:700 16px/1 var(--mono);text-align:right}
   .note{padding:8px 18px 12px;font:400 10.5px/1.6 var(--mono);color:var(--ink-2)}
-  .rna{color:var(--down)} .gna{color:var(--up)}          /* A股:红涨绿跌 */
+  .rna{color:var(--up)} .gna{color:var(--down)}          /* 全站统一绿涨红跌(rna/gna 是旧命名,颜色已对调) */
   .cup{color:var(--up)} .cdn{color:var(--down)}           /* 币圈:绿涨红跌 */
   .dim{color:var(--ink-2)}
+
+  /* 今日财运(娱乐):顶栏金色按钮 + 结果弹层,环形分数由 JS 逐帧灌 --p */
+  .fort-btn{color:#ffd27f!important;border-color:#4a3b1e!important;background:linear-gradient(180deg,#241c0e,#16120a);animation:fortglow 2.4s ease-in-out infinite}
+  @keyframes fortglow{0%,100%{box-shadow:0 0 0 rgba(255,190,80,0)}50%{box-shadow:0 0 14px rgba(255,190,80,.3)}}
+  .fort-mask{position:fixed;inset:0;z-index:80;background:rgba(4,7,12,.74);backdrop-filter:blur(4px);display:grid;place-items:center}
+  .fort-mask[hidden]{display:none}
+  .fort-card{width:min(320px,88vw);border:1px solid #2f3a4c;border-radius:16px;padding:24px 22px 20px;text-align:center;background:radial-gradient(130% 90% at 50% 0%,#211a0e 0%,#0d131d 58%),#0d131d;box-shadow:0 0 70px rgba(255,180,80,.14),0 24px 60px rgba(0,0,0,.6)}
+  .fort-eyebrow{font:600 10px/1 var(--mono);letter-spacing:.18em;color:var(--ink-2)}
+  .fort-ring{--p:0;--c:#ffd27f;position:relative;width:136px;height:136px;margin:16px auto 12px;border-radius:50%;display:grid;place-content:center;justify-items:center;gap:4px;background:conic-gradient(var(--c) calc(var(--p)*1%),#1a2433 0)}
+  .fort-ring::before{content:"";position:absolute;inset:10px;border-radius:50%;background:#0d131d;box-shadow:inset 0 0 26px rgba(255,180,80,.12)}
+  .fort-ring b{position:relative;font:800 42px/1 var(--mono);color:var(--c);text-shadow:0 0 24px rgba(255,180,80,.45)}
+  .fort-ring i{position:relative;font:600 10.5px/1 var(--mono);font-style:normal;color:var(--ink-2)}
+  .fort-lbl{font:700 16px/1.4 var(--sans);color:#ffe1a6}
+  .fort-line{font:400 11.5px/1.8 var(--mono);color:var(--ink-2);margin-top:6px;min-height:21px}
+  .fort-btns{display:flex;gap:10px;justify-content:center;margin-top:14px}
+  .fort-btns button{font:500 12px/1 var(--mono);letter-spacing:.05em;padding:8px 16px;border-radius:999px;cursor:pointer;background:transparent;border:1px solid var(--border);color:var(--ink-2)}
+  .fort-btns .fort-go{color:#141006;background:#ffd27f;border-color:#ffd27f;font-weight:700}
+
+  /* GLOBAL EVENTS 时间轴:竖轴虚线 + 影响色节点 + 资产强度条;细线小字,无渐变霓虹 */
+  .events .mnote{margin-left:auto;font:400 10px/1.6 var(--mono);color:#5c6b80;letter-spacing:.03em;text-align:right}
+  .evgrid{display:grid;grid-template-columns:minmax(0,1fr) 300px}
+  .evlist{border-right:1px dashed #17202c;max-height:440px;overflow-y:auto;-webkit-overflow-scrolling:touch;scrollbar-width:thin;scrollbar-color:#243044 transparent;padding:2px 0 10px;
+    background-image:linear-gradient(#1b2634 55%,transparent 45%);background-size:1px 9px;background-repeat:repeat-y;background-position:20px 0}
+  .evlist::-webkit-scrollbar{width:8px}
+  .evlist::-webkit-scrollbar-thumb{background:#243044;border-radius:8px}
+  .evt.past{filter:grayscale(1);opacity:.42} /* 过去一周=灰层(用户 2026-09-20 定稿) */
+  .evday.past{opacity:.6}
+  .evsec{position:sticky;top:0;z-index:4;background:linear-gradient(#10151c 78%,rgba(16,21,28,0));padding:9px 0 6px 16px;font:600 10px/1 var(--mono);letter-spacing:.2em}
+  .evsec.p{color:#4b5a6e}.evsec.t{color:#e8edf4}.evsec.f{color:#7f93ab}
+  .evday{position:sticky;top:26px;z-index:3;background:linear-gradient(#10151c 78%,rgba(16,21,28,0));font:400 9.5px/1 var(--mono);letter-spacing:.18em;color:#4b5a6e;padding:14px 0 7px 34px}
+  .evday b{color:#8fa3ba;font-weight:500}
+  .evday i{font-style:normal;color:#31404f;margin-left:8px;letter-spacing:.1em}
+  .evt{display:flex;gap:11px;padding:5px 16px 7px 34px;align-items:flex-start;position:relative}
+  /* 节点=重要度刻度(用户定稿空心):高危大圈亮红,中型小圈暗红渐淡(LOW 本就不显示) */
+  .evt .dot{position:absolute;left:15px;top:8px;width:7px;height:7px;border-radius:50%;background:#0b0f16;border:2px solid #7d4f4a;box-sizing:content-box}
+  .evt.h .dot{left:13px;top:6px;width:11px;height:11px;border-color:#e0524e;box-shadow:0 0 0 4px rgba(224,82,78,.14)}
+  .evt:hover{background:#0d131c}
+  .evt .dt{font:500 11.5px/1.45 var(--mono);color:#7f93ab;white-space:nowrap;min-width:40px;font-variant-numeric:tabular-nums}
+  .evt .dt i{display:block;font:400 8.5px/1.3 var(--mono);font-style:normal;color:#3d4c60;letter-spacing:.06em;text-align:center}
+  .evt .bd{flex:1;min-width:0}
+  .evt .ti{font-size:12.5px;line-height:1.4;color:#cdd7e3}
+  .evt .cb{font:400 8px/1.5 var(--mono);letter-spacing:.12em;color:#b9a4ff;border:1px solid #2c2c46;border-radius:3px;padding:0 5px;margin-left:7px;white-space:nowrap}
+  .evt .en{font:400 8.5px/1.5 var(--mono);letter-spacing:.09em;color:#3d4c60;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .evt .gg{font:400 9px/1.55 var(--mono);color:#4b5a6e;margin-top:1px}
+  .evt .fp{font:400 10px/1.5 var(--mono);color:#5b6c82}
+  .evt .fp b{font-weight:400;color:#8fa3ba}
+  .aas{display:flex;gap:13px;margin-top:4px;flex-wrap:wrap}
+  .ab{display:inline-flex;align-items:center;gap:5px;font:400 9px/1.3 var(--mono);letter-spacing:.06em;color:#7f93ab;white-space:nowrap}
+  .ab u{display:block;width:38px;height:3px;background:#1b2634;border-radius:2px;text-decoration:none;overflow:hidden}
+  .ab s{display:block;height:100%;border-radius:2px;background:#8fa3ba}
+  .ab.l3 s{background:#c2d0e0}
+  .evcard .aas{margin-top:9px}
+  .evside .evcard{padding:14px 16px 16px;border-bottom:1px dashed #17202c}
+  .evcard .ct{font:400 9px/1 var(--mono);letter-spacing:.14em;color:#4b5a6e}
+  .evcard .nt{font:500 13.5px/1.45 var(--sans);color:#e8edf3;margin-top:8px}
+  .evcard .ne{font:400 8.5px/1.5 var(--mono);letter-spacing:.09em;color:#3d4c60;text-transform:uppercase;margin-top:1px}
+  .evcard .cd{font:600 27px/1.1 var(--mono);letter-spacing:.05em;color:#ffd27f;margin-top:11px;font-variant-numeric:tabular-nums}
+  .evcard .np{height:3px;background:#1b2634;border-radius:2px;margin-top:9px;overflow:hidden}
+  .evcard .np s{display:block;height:100%;background:#ffd27f;border-radius:2px}
+  .evcard .im{font:500 10px/1 var(--mono);letter-spacing:.08em;color:#8fa3ba;margin-top:9px}
+  .evcard .wk{font:600 15px/1.3 var(--mono);letter-spacing:.05em;margin-top:9px}
+  .evcard .rnums{display:flex;align-items:baseline;gap:5px 14px;margin-top:10px;font:400 10px/1 var(--mono);color:#5b6c82}
+  .evcard .rnums b{font:600 26px/1 var(--mono);font-variant-numeric:tabular-nums}
+  .evcard .rnums .rh b{color:#e0736e}
+  .evcard .rnums .rm b{color:#d9a455}
+  .evcard .rbar{display:flex;height:6px;border-radius:3px;overflow:hidden;background:#161d28;margin-top:11px}
+  .evcard .rbar i{display:block;height:100%;background:#243044}
+  .evcard .wl{font:400 9.5px/1.6 var(--mono);color:#5b6c82;margin-top:6px}
+  @media(max-width:900px){.evgrid{grid-template-columns:1fr}.evlist{border-right:0;border-top:1px dashed #17202c;order:2}.evside{display:grid;grid-template-columns:1fr 1fr;order:1}.evside .evcard{border-bottom:0;border-right:1px dashed #17202c}}
+
+  /* 手机适配(≤640):收紧留白与大字,KPI 磁贴 4→2 列、统计格 2 列 */
+  @media(max-width:640px){
+    .gleft{padding:6px 12px 12px}
+    .gts{grid-template-columns:1fr 1fr}
+    .gt:nth-child(2n+1){border-left:0}
+    .gt:nth-child(-n+2){border-top:0}
+    .gstats{padding:2px 0}
+    .gs{flex:1 1 50%}
+    .gs:nth-child(odd){border-left:0}
+    .gright{padding:12px;grid-template-columns:1fr}
+    .glg{min-width:0}
+    .pad,.note{padding-left:12px;padding-right:12px}
+    .bigc{padding:10px 11px 4px}
+    .bigc .pv{font-size:clamp(17px,5.4vw,21px)}
+    .kv,.mini{padding-left:8px;padding-right:8px}
+    .sigs,.oppwrap{padding-left:12px;padding-right:12px}
+    .gcap{padding-left:12px;padding-right:12px}
+    .sig{padding:11px 12px}
+    .opprow{padding-left:12px;padding-right:12px}
+    .gmk .phead{flex-wrap:wrap;align-items:flex-start}
+    .gmk .mnote{margin-left:0;width:100%;text-align:left}
+    .events .phead{flex-wrap:wrap;align-items:flex-start}
+    .events .mnote{margin-left:0;width:100%;text-align:left}
+    .evside{grid-template-columns:1fr}
+    .evside .evcard{border-right:0;border-bottom:1px dashed #17202c}
+    .evt{padding-left:26px;padding-right:12px}
+    .evday{padding-left:26px}
+    .evlist{max-height:340px}
+    .evcard .cd{font-size:22px}
+  }
+  /* ===== THRR Motion System(六原语:90%静止/10%响应,全部绑定数据;reduce 熔断见 theme.css L53)===== */
+  /* ① data-tick:仅数值变化时闪一下(JS diff 后挂 .tk,700ms 自摘) */
+  @keyframes tk{from{text-shadow:0 0 14px rgba(150,200,255,.85)}to{text-shadow:0 0 0 transparent}}
+  .tk{animation:tk .6s ease-out}
+  /* ② radar-scan:今日信号每次渲染横扫一次(非无限),卡片随光带依次微亮 */
+  .sigs.scan{position:relative;overflow:hidden}
+  .sigs.scan::after{content:"";position:absolute;inset:0;pointer-events:none;
+    background:linear-gradient(90deg,transparent 40%,rgba(84,165,255,.42) 50%,transparent 60%);
+    background-size:250% 100%;animation:radar 1.7s ease-out 1}
+  @keyframes radar{0%{background-position:250% 0;opacity:0}12%{opacity:1}100%{background-position:-150% 0;opacity:0}}
+  .sigs.scan .sig{animation:siglit .5s ease-out}
+  .sigs.scan .sig:nth-child(2){animation-delay:.28s}.sigs.scan .sig:nth-child(3){animation-delay:.56s}
+  .sigs.scan .sig:nth-child(4){animation-delay:.84s}.sigs.scan .sig:nth-child(5){animation-delay:1.12s}
+  @keyframes siglit{45%{border-color:#3f6fc4;box-shadow:0 0 12px rgba(84,165,255,.22)}}
+  /* ③ event-glow:高危空心环渲染时一次性外扩光晕;NEXT 倒计时是全页唯一"活着的数据",保留缓慢呼吸 */
+  .evlist.glow .evt.h .dot{animation:halo 1.8s ease-out 1}
+  @keyframes halo{0%{box-shadow:0 0 0 4px rgba(224,82,78,.4)}100%{box-shadow:0 0 0 16px rgba(224,82,78,0)}}
+  #ev-next .cd{animation:cdglow 3s ease-in-out infinite}
+  @keyframes cdglow{50%{text-shadow:0 0 16px rgba(255,210,127,.45)}}
+  /* ④ temperature ring:@property 注册让 --p 可插值(不支持的浏览器退化为中点硬切,可接受) */
+  @property --p{syntax:'<number>';inherits:false;initial-value:0}
+  .mtemp{display:flex;align-items:center;gap:10px;margin-top:12px;position:relative;z-index:1;
+    font:600 9.5px/1.5 var(--mono);letter-spacing:.14em;color:#6f9fd8;text-transform:uppercase}
+  .mtemp b{font-size:15px;color:#fff;letter-spacing:.02em}
+  .tring{--p:0;position:relative;width:38px;height:38px;border-radius:50%;flex:none;animation:ringfill 1s ease-out;
+    background:conic-gradient(var(--c,#7fd7ff) calc(var(--p)*1%),#1a2433 0);
+    -webkit-mask:radial-gradient(circle,transparent 63%,#000 64%);mask:radial-gradient(circle,transparent 63%,#000 64%)}
+  @keyframes ringfill{from{--p:0}}
+  /* ⑤ energy-flow:资金/动量行随 tick 流 3 个来回;方向=符号,速度=幅度(JS 写 animation-duration) */
+  @keyframes flowIn{to{background-position:-250% 0}}
+  @keyframes flowOut{to{background-position:250% 0}}
+  .f-up,.f-dn{background-size:250% 100%;background-repeat:no-repeat}
+  .f-up{background-image:linear-gradient(90deg,transparent,rgba(255,107,107,.13),transparent);background-position:120% 0;animation:flowIn 2.4s linear 3}
+  .f-dn{background-image:linear-gradient(90deg,transparent,rgba(88,214,141,.13),transparent);background-position:-120% 0;animation:flowOut 2.4s linear 3}
+  /* 币圈动量区:绿涨红跌,流向改为向左=涨 */
+  #oppC .f-up{background-image:linear-gradient(90deg,transparent,rgba(88,214,141,.13),transparent);animation-name:flowOut}
+  #oppC .f-dn{background-image:linear-gradient(90deg,transparent,rgba(255,107,107,.13),transparent);animation-name:flowIn}
+  /* ⑥ signal-pulse:|涨跌|≥5% 的新数据 → 行体双脉冲 + 一次性徽标(JS 注入 .mm,6s 自清) */
+  @keyframes anom{25%{background:#171014;box-shadow:inset 0 0 0 1px rgba(224,82,78,.6),0 0 16px rgba(224,82,78,.2)}100%{box-shadow:none}}
+  .opprow.anom,.bigc.anom{animation:anom 1.2s ease-out 2}
+  .mm{font:700 8px/1 var(--mono);letter-spacing:.14em;color:#ffb4a4;border:1px solid #5c3330;border-radius:3px;padding:2px 5px;margin-left:8px;white-space:nowrap}
+  /* ⑦ mouse-follow:卡片一层 6% 光斑,只跟不缩放;触屏设备(hover:none)整段不生效 */
+  @media(hover:hover){
+    .panel{position:relative}
+    .panel::before{content:"";position:absolute;inset:0;z-index:0;pointer-events:none;opacity:0;transition:opacity .25s;
+      background:radial-gradient(340px 200px at var(--mx,-400px) var(--my,-400px),rgba(84,165,255,.06),transparent 70%)}
+    .panel:hover::before{opacity:1}
+  }
+  /* ⑧ market-pulse:背景呼吸档位由波动率决定(JS 挂 body.vol-h/vol-m),默认静止 */
+  body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+    background:radial-gradient(60% 45% at 50% -5%,rgba(43,132,253,.05),transparent 70%),
+               radial-gradient(50% 40% at 88% 105%,rgba(185,164,255,.04),transparent 70%)}
+  @keyframes breathe{50%{opacity:.4}}
+  body.vol-m::before{animation:breathe 14s ease-in-out infinite}
+  body.vol-h::before{animation:breathe 7s ease-in-out infinite}
+  body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:0;
+    background:radial-gradient(70% 55% at 50% 45%,rgba(255,190,80,.07),transparent 70%)}
+  @keyframes flash{15%{opacity:1}100%{opacity:0}}
+  body.flash::after{animation:flash 1.6s ease-out 1}
+  @media(max-width:640px){.mtemp{margin-top:9px}.panel::before{display:none}}
 </style>
 </head>
 <body>
@@ -107,59 +269,78 @@
   <div class="brand"><span class="dot"></span><h1>投资雷达</h1></div>
   <nav>
     <a href="hub.html">总览</a>
-    <a href="stock.html">A股</a>
     <a href="crypto.html">币圈</a>
+    <a href="stock.html">A股</a>
     <a href="dashboard.html">我的财富<span class="lk">🔒</span></a>
     <a href="cashflow.html">流水<span class="lk">🔒</span></a>
     <a href="holdings.html">持仓<span class="lk">🔒</span></a>
   </nav>
+  <div class="pills"><button id="fortune-btn" class="fort-btn">🧧 测今日财运</button></div>
   <div class="who" id="who"></div>
 </header>
+<!-- 今日财运(娱乐):点顶栏按钮弹出,hub.js 调 GET /api/fortune 填分 -->
+<div class="fort-mask" id="fort" hidden>
+  <div class="fort-card">
+    <div class="fort-eyebrow">TODAY'S FORTUNE · 娱乐功能</div>
+    <div class="fort-ring" id="fort-ring"><b id="fort-num">–</b><i>财运分</i></div>
+    <div class="fort-lbl" id="fort-lbl">正在读取财运…</div>
+    <div class="fort-line" id="fort-line"></div>
+    <div class="fort-btns">
+      <button class="fort-go" id="fort-again">再测一次</button>
+      <button id="fort-close">关闭</button>
+    </div>
+  </div>
+</div>
 <div class="status" id="status">加载中…</div>
 
 <main>
-  <!-- ① 市场大盘带:标题+时间 | A股三大指数 | 市值分布 -->
-  <section class="panel pulse">
-    <div class="pl">
-      <div class="eyebrow">MARKET PULSE · 全球市场一屏</div>
-      <div class="hl" id="pulse-hl">…</div>
-      <div class="hd" id="pulse-sub"></div>
-      <div class="meta" id="pulse-meta"></div>
+  <!-- ① 全球市场·宏观(2026-09-20 总览改版照参考图):8 KPI 磁贴 + 统计条 + 30日归一走势;合成温度环并入统计条 -->
+  <section class="panel gmk">
+    <div class="phead rowhead">
+      <div><div class="eyebrow">GLOBAL MARKET · 全球一盘</div><h2>全球市场 · 宏观</h2></div>
+      <div class="mnote" id="gmk-upd">走势归一:30日前 = 100 · 同标尺可比</div>
     </div>
-    <div class="pix" id="pulse-idx"></div>
-    <div class="pc">
-      <div class="capT">市场市值分布</div>
-      <div class="cwrap" id="pulse-cap"></div>
-      <div class="lg" id="pulse-lg"></div>
+    <div class="gwrap">
+      <div class="gleft">
+        <div class="gts" id="gk-tiles"><div class="note" style="grid-column:1/-1">加载中…</div></div>
+        <div class="gstats">
+          <div class="gs"><span class="k">全球总市值</span><span class="v" id="gs-mcap">—</span></div>
+          <div class="gs"><span class="k">BTC.D 币市占比</span><span class="v" id="gs-dom">—</span></div>
+          <div class="gs"><span class="k">VIX 恐慌指数</span><span class="v" id="gs-vix">—</span></div>
+          <div class="gs"><span class="k">市场情绪</span><span class="v" id="gs-fng">—</span><div class="fbar"><i id="fng-pin"></i></div></div>
+          <div class="gs mtemp" id="mkt-temp"></div><!-- THRR 合成温度环(motionPass 灌值) -->
+        </div>
+      </div>
+      <div class="gright">
+        <div class="cap">主要资产 30 日走势(归一化)</div>
+        <svg id="gk-chart" viewBox="0 0 100 40" preserveAspectRatio="none" aria-hidden="true"></svg>
+        <div class="glg" id="gk-legend"></div>
+      </div>
     </div>
-  </section>
-
-  <!-- ② A股 / 币圈 核心行情 -->
-  <div class="mktrow">
-    <section class="panel mkt">
-      <div class="phead rowhead">
-        <div><div class="eyebrow">CHINA A-SHARE · 大陆</div><h2>A股</h2></div>
-        <a class="go" href="stock.html">进雷达 →</a>
-      </div>
-      <div class="astats" id="ashare-stats"><div class="note">加载中…</div></div>
-    </section>
-    <section class="panel mkt">
-      <div class="phead rowhead">
-        <div><div class="eyebrow">CRYPTO · 加密</div><h2>币圈</h2></div>
-        <a class="go" href="crypto.html">进雷达 →</a>
-      </div>
-      <div class="inner" id="crypto-idx"><div class="note">加载中…</div></div>
-      <div class="strip" id="crypto-strip"></div>
-    </section>
-  </div>
-
-  <!-- ③ Today's Signals -->
-  <section class="panel">
-    <div class="phead"><div class="eyebrow">TODAY'S SIGNALS · 直接告诉你发生了什么</div><h2>今日信号</h2></div>
+    <!-- 今日信号并入本板块(2026-09-20 用户要求,板块随之向下扩展;id/class 未动,hub.js renderSignals/radar-scan 零改动) -->
+    <div class="gcap">今日信号 · 直接告诉你发生了什么</div>
     <div class="sigs" id="signals"><div class="note">加载中…</div></div>
   </section>
 
-  <!-- ④ Top Opportunities -->
+  <!-- ② A股 | 币圈 双面板:大卡+次级读数+热门 chips(成交额较昨日/板块为二传,东财限流不阻主渲染) -->
+  <div class="mktrow">
+    <section class="panel">
+      <div class="phead rowhead">
+        <div><div class="eyebrow">CHINA A-SHARE · 大陆</div><h2>A股</h2></div>
+        <a class="go" href="stock.html">查看详情 →</a>
+      </div>
+      <div class="pad" id="ash-box"><div class="note">加载中…</div></div>
+    </section>
+    <section class="panel">
+      <div class="phead rowhead">
+        <div><div class="eyebrow">CRYPTO · 加密</div><h2>币圈</h2></div>
+        <a class="go" href="crypto.html">查看详情 →</a>
+      </div>
+      <div class="pad" id="cry-box"><div class="note">加载中…</div></div>
+    </section>
+  </div>
+
+  <!-- ③(旧独立今日信号已并入板块①末尾)Top Opportunities -->
   <div class="mktrow">
     <section class="panel">
       <div class="phead rowhead">
@@ -179,9 +360,25 @@
     </section>
   </div>
 
+  <!-- ⑤ GLOBAL EVENTS:过去7天(灰)+未来14日高/中级事件时间轴,三段分区头+日期头均吸附(ForexFactory 当周feed+本地台账滚动攒,标题机翻,影响资产为启发式,非建议) -->
+  <section class="panel events">
+    <div class="phead rowhead">
+      <div><div class="eyebrow">GLOBAL EVENTS · NEXT <span id="ev-cov">—</span> DAYS</div><h2>事件雷达</h2></div>
+      <div class="mnote">时间层次:已发生(灰)/今天/未来两周 · 圆点越大越红 = 影响越高 · LOW 隐藏 · ForexFactory + 手动台账 · 北京时区</div>
+    </div>
+    <div class="evgrid">
+      <div class="evlist" id="ev-list"><div class="note">加载中…</div></div>
+      <div class="evside">
+        <div class="evcard" id="ev-next"><div class="ct">NEXT BIG EVENT</div><div class="note">—</div></div>
+        <div class="evcard" id="ev-risk"><div class="ct">THIS WEEK · MARKET RISK</div></div>
+      </div>
+    </div>
+  </section>
+
   <p class="foot" id="footnote"></p>
 </main>
-<script src="nav.js"></script>
-<script src="hub.js"></script>
+<script src="nav.js?v=20260921a"></script>
+<script src="hub.js?v=20260920l"></script>
+<script src="stats.js?v=20260920d"></script>
 </body>
 </html>

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- 投资雷达 icon:深夜蓝底 + 绿涨曲线 + 品牌蓝光点(同 theme.css .brand .dot #54a5ff) -->
+  <rect width="64" height="64" rx="14" fill="#0a1428"/>
+  <path d="M10 46 L24 33 L34 39 L52 17" fill="none" stroke="#58d68d" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="52" cy="15" r="6.5" fill="#54a5ff"/>
+</svg>

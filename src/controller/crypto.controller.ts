@@ -30,9 +30,21 @@ export class CryptoController {
     return { success: true, message: 'OK', data };
   }
 
+  @Get('/oi/history')
+  async oiHistory(@Query('coin') coin?: string, @Query('r') r?: string) {
+    const data = await this.cryptoService.oiHistory(coin || 'BTC', r || '7d');
+    return { success: true, message: 'OK', data };
+  }
+
   @Get('/news')
   async news() {
     const data = await this.cryptoService.news();
+    return { success: true, message: 'OK', data };
+  }
+
+  @Get('/book')
+  async book() {
+    const data = await this.cryptoService.book();
     return { success: true, message: 'OK', data };
   }
 

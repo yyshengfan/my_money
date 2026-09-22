@@ -4,7 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>我的财富</title>
-<link rel="stylesheet" href="theme.css">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="stylesheet" href="theme.css?v=20260921a">
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
 <style>
   /* 页面私有样式;共用规格见 theme.css */
@@ -63,6 +64,23 @@
   .cats button{font:500 11.5px/1 var(--mono);color:var(--ink-2);background:transparent;border:1px solid var(--border);border-radius:999px;padding:6px 12px;cursor:pointer}
   .cats button.on{color:var(--ink);border-color:currentColor}
   .cdot{display:inline-block;width:7px;height:7px;border-radius:99px;margin-right:6px;vertical-align:1px}
+
+  /* 手机适配(≤640):hero 数字收敛、环形塌到列表上方、行距收紧 */
+  @media(max-width:640px){
+    .hero-main{padding:16px 14px}
+    .hero-total{font-size:clamp(26px,8vw,32px);margin:10px 0 12px}
+    .alloc{grid-template-columns:1fr;gap:2px}
+    #donut{height:200px;width:100%}
+    .alloc-list{width:100%;padding:4px 6px 12px}
+    .arow{grid-template-columns:minmax(0,1fr) auto auto;gap:6px}
+    .chart{height:260px}
+    .chart-tall{height:280px}
+    .rrow{grid-template-columns:52px minmax(0,1fr) 74px 58px;gap:8px;padding-left:12px;padding-right:12px}
+    .rank,.cashstrip,.cats{padding-left:12px;padding-right:12px}
+    .toggle{float:none;margin:6px 0 2px}
+    .kpi{padding:13px 14px}
+    .rrow .rv,.rrow .rp{font-size:11.5px}
+  }
 </style>
 </head>
 <body>
@@ -70,8 +88,8 @@
   <div class="brand"><span class="dot"></span><h1>我的财富</h1></div>
   <nav>
     <a href="hub.html">总览</a>
-    <a href="stock.html">A股</a>
     <a href="crypto.html">币圈</a>
+    <a href="stock.html">A股</a>
     <a href="dashboard.html">我的财富<span class="lk">🔒</span></a>
     <a href="cashflow.html">流水<span class="lk">🔒</span></a>
     <a href="holdings.html">持仓<span class="lk">🔒</span></a>
@@ -143,7 +161,7 @@
     <div class="chart" id="catdetail"></div>
   </section>
 </main>
-<script src="nav.js"></script>
+<script src="nav.js?v=20260921a"></script>
 <script src="dashboard.js"></script>
 <script>loadAndRender();</script>
 </body>

@@ -6,7 +6,7 @@
  *   HTTPS_PROXY/HTTP_PROXY 环境变量 → macOS 系统代理(scutil --proxy)→ 直连。
  * 探测到的代理写回 env,axios(follow-redirects)原生识别 HTTP(S)_PROXY/NO_PROXY;
  * 国内源(qt.gtimg.cn)进 NO_PROXY 名单,代理挂了也不影响大A/持仓行情。
- * ponytail:缓存放内存、重启即清,60s 级限流够用;要跨重启持久再上 redis。
+ * ponytail:缓存放内存、重启即清,5min 级限流够用(见 cached 的数据分层);要跨重启持久再上 redis。
  */
 import { execSync } from 'child_process';
 import axios from 'axios';
@@ -89,14 +89,26 @@ export async function postJson(
 
 const store = new Map<string, { v: any; t: number }>();
 
+// 数据分层(2026-09-20 用户要求):实时源(短 TTL 缓存)最快 5 分钟拉一次上游,省配额防限流;
+// ttl=0 是 ?fresh= 强制刷新的特例,不抬。长缓存层(macro 15min/events 1h/译文 7d)本来就 ≥5min,不受影响。
+export const REALTIME_MIN = 300_000;
+export const effTtl = (ttlMs: number) => (ttlMs > 0 ? Math.max(ttlMs, REALTIME_MIN) : 0);
+
 export async function cached<T>(
   key: string,
   ttlMs: number,
   fn: () => Promise<T>
 ): Promise<T> {
+  const ttl = effTtl(ttlMs);
   const hit = store.get(key);
-  if (hit && Date.now() - hit.t < ttlMs) return hit.v;
-  const v = await fn(); // 失败不缓存,下次刷新即重试
-  store.set(key, { v, t: Date.now() });
-  return v;
+  if (hit && Date.now() - hit.t < ttl) return hit.v;
+  try {
+    const v = await fn();
+    store.set(key, { v, t: Date.now() });
+    return v;
+  } catch (e) {
+    // 拉取超时/挂了 → 有旧缓存(哪怕已过期)就顶上,数据旧但诚实,好过红卡白屏;从没成功过才向上抛
+    if (hit) return hit.v as T;
+    throw e;
+  }
 }

@@ -12,6 +12,9 @@ export interface QtRow {
   chgPct: number;
   time: string;
   amountWan?: number; // 成交额(万元) f37,指数与个股同构;空/0 不写
+  mcapYi?: number; // 总市值(亿元) f44;ETF=场内规模口径,基金观察用(2026-09-22);空/0 不写
+  pe?: number;  // A股 f39(动态) / 港股 f51(TTM,亏损为负);指数 f39 是其整体 PE
+  pb?: number;  // A股 f46;港股无可靠列,给不了(持仓页显示 —)
 }
 
 // 腾讯免费行情 qt.gtimg.cn,免鉴权。每行形如:
@@ -37,6 +40,12 @@ export function parseTencent(text: string): Record<string, QtRow> {
     };
     const amt = f.length > 37 ? Number(f[37]) : NaN;
     if (isFinite(amt) && amt > 0) row.amountWan = amt;
+    const mc = f.length > 44 ? Number(f[44]) : NaN;
+    if (isFinite(mc) && mc > 0) row.mcapYi = mc;
+    // PE/PB 列位 A股/港股不同(实测 2026-09):A=39/46,港=51(PB 无可靠列);0/脏值丢弃
+    const fin = (x: any) => (isFinite(Number(x)) && Number(x) !== 0 ? Number(x) : undefined);
+    if (m[1].startsWith('hk')) row.pe = fin(f[51]);
+    else { row.pe = fin(f[39]); row.pb = fin(f[46]); }
     out[m[1]] = row;
   }
   return out;
@@ -50,8 +59,9 @@ export function quoteCode(code: string, market: string): string {
 
 @Provide()
 export class QtService {
-  async quotes(codes: string[]): Promise<Record<string, QtRow>> {
-    return cached('qt:' + codes.join(','), 60_000, async () => {
+  // fresh=true 跳过 60s 缓存直连(持仓页「刷新」按钮),其余调用方走缓存不变
+  async quotes(codes: string[], fresh = false): Promise<Record<string, QtRow>> {
+    return cached('qt:' + codes.join(','), fresh ? 0 : 60_000, async () => {
       const buf = await getBuffer('https://qt.gtimg.cn/q=' + codes.join(','));
       const TD: any = (globalThis as any).TextDecoder;
       return parseTencent(new TD('gbk').decode(buf));

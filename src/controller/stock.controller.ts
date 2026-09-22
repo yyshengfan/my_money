@@ -1,4 +1,4 @@
-import { Controller, Get, Inject } from '@midwayjs/core';
+import { Controller, Get, Inject, Query } from '@midwayjs/core';
 import { AShareService } from '../service/market.service';
 import { MxService } from '../service/mx.service';
 
@@ -32,7 +32,14 @@ export class StockController {
     };
   }
 
-  @Get('/opportunity')
+    @Get('/board-reasons')
+  async boardReasons(@Query('names') names = '') {
+    const arr = String(names).split(',').map(x => x.trim()).filter(Boolean).slice(0, 12);
+    const data = await this.stock.boardReasons(arr).catch(() => ({}));
+    return { success: true, message: 'OK', data };
+  }
+
+@Get('/opportunity')
   async opportunity() {
     const em = await this.stock.opportunity().then(
       d => ({ ok: true as const, data: d }),
@@ -49,6 +56,33 @@ export class StockController {
     return { success: true, message: 'OK', data: { em, mx } };
   }
 
+  // ③ 价值投资派:妙想 MX 语义选股(基本面免费源唯一路),缓存 3600s;失败只红本卡
+  @Get('/value')
+  async value() {
+    const mx = await this.mx.valuePicks().catch((e: any) => ({ ok: false as const, error: String(e?.message || e) }));
+    return { success: true, message: 'OK', data: { mx } };
+  }
+
+  // 基金观察:固定清单(data/fund_watch.json)区间收益 + 今日涨跌,60s 缓存
+  @Get('/funds')
+  async funds() {
+    const em = await this.stock.funds().then(
+      d => ({ ok: true as const, data: d }),
+      (e: any) => ({ ok: false as const, error: String(e?.message || e) })
+    );
+    return { success: true, message: 'OK', data: { em } };
+  }
+
+  // ③ 趋势投资派:东财候选 + 腾讯日K本地算指标(MA/MACD/RSI/量能),60s 缓存
+  @Get('/trend')
+  async trend() {
+    const em = await this.stock.trendPicks().then(
+      d => ({ ok: true as const, data: d }),
+      (e: any) => ({ ok: false as const, error: String(e?.message || e) })
+    );
+    return { success: true, message: 'OK', data: { em } };
+  }
+
   @Get('/flow')
   async flow() {
     return {
@@ -61,6 +95,18 @@ export class StockController {
         ),
       },
     };
+  }
+
+  @Get('/moneyflow')
+  async moneyflow() {
+    const wrap = (p: Promise<any>) =>
+      p.then(
+        d => ({ ok: true as const, data: d }),
+        (e: any) => ({ ok: false as const, error: String(e?.message || e) })
+      );
+    // em = 两市分时/沪市日线主力净额;nb = 北向成交额(净买入已停发)——两源各自 ok/error,互不拖累
+    const [em, nb] = await Promise.all([wrap(this.stock.moneyflow()), wrap(this.stock.northbound())]);
+    return { success: true, message: 'OK', data: { em, nb } };
   }
 
   @Get('/news')

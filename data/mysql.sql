@@ -74,3 +74,18 @@ INSERT IGNORE INTO holding (`code`,`name`,`market`) VALUES
 
 -- 登录种子:pass_hash 落库时用 src/service/auth.service.ts 的 hashPassword('初始密码') 生成
 -- INSERT INTO app_users (`username`,`pass_hash`) VALUES ('tianhui', '<salt:hex>');  -- 实际用 node scripts/seed_user.js tianhui <密码>
+
+-- ===== 浏览统计 stat_view(2026-09-20):每个访客 IP 一行,总浏览量 = SUM(views),可直接查表 =====
+-- 写入方:StatsService(src/service/stats.service.ts)在 POST /api/stats/view 里
+--   INSERT ... ON DUPLICATE KEY UPDATE views = views + 1(每打开一次页面计一次;前端同标签页刷新不重复上报)
+-- 常用查询:各 IP 排行  SELECT page, ip, views, updated_at FROM stat_view ORDER BY views DESC;
+--           某页总浏览 SELECT SUM(views) FROM stat_view WHERE page = 'hub';
+CREATE TABLE IF NOT EXISTS stat_view (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `page` varchar(40) NOT NULL COMMENT '页面key:hub/stock/crypto',
+  `ip` varchar(64) NOT NULL COMMENT '访客真实IP(IPv6最长45字符)',
+  `views` int NOT NULL DEFAULT 0 COMMENT '该IP浏览次数',
+  `updated_at` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '最近一次浏览',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_page_ip` (`page`, `ip`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

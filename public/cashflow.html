@@ -4,7 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>资金流水</title>
-<link rel="stylesheet" href="theme.css">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="stylesheet" href="theme.css?v=20260921a">
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
 <style>
   /* 页面私有样式;共用规格(令牌/画布/顶栏/面板/pill/foot)见 theme.css */
@@ -56,6 +57,19 @@
   td.cmt{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:280px;text-align:left;font-family:var(--sans);color:var(--ink-2)}
   td.money{color:var(--asset);font-weight:600}
   .empty{color:var(--ink-2);font-size:13px;padding:18px 0;text-align:center}
+
+  /* 手机适配(≤640):KPI 2×2 紧凑卡 + 表密度收紧(覆盖上方 @520 单列断点) */
+  @media(max-width:640px){
+    .cards{grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:12px}
+    .card{padding:13px 14px;gap:8px}
+    .card .dv{font-size:clamp(18px,6vw,23px)}
+    .card .dk{font-size:9px}
+    .b{grid-template-columns:52px 1fr 76px;padding-left:12px;padding-right:12px}
+    .bars{padding-left:6px;padding-right:6px}
+    table{font-size:12px}
+    .tscroll{padding:6px 10px 14px}
+    th,td{padding:8px 8px}
+  }
 </style>
 </head>
 <body>
@@ -63,8 +77,8 @@
     <div class="brand"><span class="dot"></span><h1>资金流水</h1></div>
     <nav>
       <a href="hub.html">总览</a>
-      <a href="stock.html">A股</a>
       <a href="crypto.html">币圈</a>
+      <a href="stock.html">A股</a>
       <a href="dashboard.html">我的财富<span class="lk">🔒</span></a>
       <a href="cashflow.html">流水<span class="lk">🔒</span></a>
       <a href="holdings.html">持仓<span class="lk">🔒</span></a>
@@ -106,7 +120,7 @@
   </div>
 
   <p class="foot">口径说明:账本字段「总出帐/生活开支」会把理财市值波动记进去(如 2026-05 备注含 A股/币亏损),本页一律不用,只呈现进账与显性支出(信用卡+房租+房贷+社保+其他)。支出环比箭头用中性色 —— 支出下降是好事,不标绿也不标红。</p>
-<script src="nav.js"></script>
+<script src="nav.js?v=20260921a"></script>
 <script src="cashflow.js"></script>
 </body>
 </html>

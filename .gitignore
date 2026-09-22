@@ -3,3 +3,7 @@ dist/
 logs/
 package-lock.json
 runtime/
+data/moneyflow_daily.json
+data/stats.json
+data/events_daily.json
+data/crypto_holdings.json

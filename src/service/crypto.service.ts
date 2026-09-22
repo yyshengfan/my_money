@@ -34,7 +34,7 @@ async function fetchBest<T>(
   }
   throw lastErr;
 }
-async function binance24h(sym: string) {
+export async function binance24h(sym: string) { // holding.service 币圈持仓复用,勿双实现
   return fetchBest(
     [
       `https://data-api.binance.vision/api/v3/ticker/24hr?symbol=${sym}`,
@@ -53,13 +53,32 @@ async function binance24h(sym: string) {
 
 const USDT_PAIRS = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT'];
 const FUND_COINS = ['BTC', 'ETH', 'BNB']; // 资金费率对比的币种
-const DOM_IDS = ['bitcoin', 'ethereum', 'solana', 'binancecoin', 'okb'];
+const DOM_IDS = ['bitcoin', 'ethereum', 'solana', 'binancecoin', 'okb', 'bitget-token'];
+const OI_COINS = ['BTC', 'ETH', 'SOL', 'BNB', 'OKB']; // OI 趋势对比的币种;BGB 仅 Bitget 本所有交易、无免费历史接口,不入图
+
+// 90日涨跌幅:CoinGecko /coins/markets 的 price_change_percentage 不支持 90d 档(官方仅
+// 1h/24h/7d/14d/30d/200d/1y,传了恒回 null),改逐币 market_chart(days=90)按(末值/首值-1)现算。
+// 90 日首值一日内几乎不动 → 按币缓存 20h(失败 1h 后重试),省免费档配额。
+const CHG90: Record<string, { at: number; pct: number | null }> = {};
+async function chg90(id: string): Promise<number | null> {
+  const g = CHG90[id];
+  if (g && Date.now() - g.at < (g.pct != null ? 20 : 1) * 3600e3) return g.pct;
+  let pct: number | null = null;
+  try {
+    const mj = await getJson(`https://api.coingecko.com/api/v3/coins/${id}/market_chart?vs_currency=usd&days=90&interval=daily`);
+    const ps = mj?.prices;
+    if (Array.isArray(ps) && ps.length > 60 && ps[0][1] > 0) pct = ((ps[ps.length - 1][1] - ps[0][1]) / ps[0][1]) * 100;
+  } catch { /* 失败短冷却后重试 */ }
+  CHG90[id] = { at: Date.now(), pct };
+  return pct;
+}
 const DOM_SYM: Record<string, string> = {
   bitcoin: 'BTC',
   ethereum: 'ETH',
   solana: 'SOL',
   binancecoin: 'BNB',
   okb: 'OKB',
+  'bitget-token': 'BGB',
 };
 
 // 活动/机会关键词:Binance/Bybit/Bitget 标题命中则排前,补足 3 条
@@ -119,7 +138,7 @@ async function trMyMemory(t: string): Promise<string | null> {
     return null;
   }
 }
-async function zhTitle(t: string): Promise<string> {
+export async function zhTitle(t: string): Promise<string> { // events.service 复用(事件标题译简体),勿双实现
   if (!t || HAS_CJK.test(t)) return t;
   return cached('zh:' + t, 7 * 24 * 3600e3, async () => {
     const zh = (await trGtx(t)) || (await trMyMemory(t));
@@ -152,11 +171,28 @@ function htmlUnescape(s: string): string {
     .replace(/&(#[xX]?[0-9a-zA-Z]+|amp|lt|gt|quot|apos|nbsp);/g, (m, e) => ENT[e.toLowerCase()] ?? m);
 }
 
+// 日涨幅纯函数(2026-09-21 用户要求,对齐 OKX App「日涨幅」):OKX 日K bar=1D 以北京 00:00 开盘
+// (1Dutc 才是 UTC 零点,勿混),行=[ts,o,h,l,c,...],c 为当下价 → (c-o)/o×100;行缺/价非法 null
+export function okxDayPct(row: any[]): number | null {
+  const o = +row?.[1], c = +row?.[4];
+  return o > 0 && isFinite(c) ? ((c - o) / o) * 100 : null;
+}
+
+// ④ 合约挂单簿纯函数:币安永续 depth 千档 {bids,asks}=[[价,量]字符串数组] → 买/卖名义(USDT≈$)、买盘%、中间价、一档价差bp;无有效盘口 null
+export function bookCalc(d: any) {
+  const sum = (legs: any[]) => (legs || []).reduce((t: number, l: any) => t + (+l[0] * +l[1]), 0);
+  const bid = sum(d?.bids), ask = sum(d?.asks);
+  const b0 = +(d?.bids?.[0] || [])[0], a0 = +(d?.asks?.[0] || [])[0];
+  if (!(bid > 0 && ask > 0 && b0 > 0 && a0 > b0)) return null;
+  const mid = (a0 + b0) / 2;
+  return { px: mid, bidUsd: bid, askUsd: ask, bidPct: (bid / (bid + ask)) * 100, spreadBp: ((a0 - b0) / mid) * 1e4 };
+}
+
 @Provide()
 export class CryptoService {
   async overview() {
     return cached('crypto:overview', 30_000, async () => {
-      const [binance, okx, fut, fng, global, dom] = await Promise.all([
+      const [binance, okx, fut, fng, global, dom, cmc100, cd20, spark, domx, day] = await Promise.all([
         // 现货 24h × 4 币:Binance 大陆镜像优先,挂了回退国际站(fetchBest)
         safe(async () => {
           const rows = await Promise.all(USDT_PAIRS.map(s => binance24h(s)));
@@ -187,14 +223,14 @@ export class CryptoService {
           const coins = await Promise.all(
             ['BTC', 'ETH'].map(async sym => {
               const [pi, oi, ls] = await Promise.all([
-                getJson(`https://fapi.binance.com/fapi/v1/premiumIndex?symbol=${sym}USDT`, 6000),
+                getJson(`https://fapi.binance.com/fapi/v1/premiumIndex?symbol=${sym}USDT`,  9000),
                 getJson(
-                  `https://fapi.binance.com/fapi/v1/futures/data/openInterestHist?symbol=${sym}USDT&period=5m&limit=1`,
-                  6000
+                  `https://fapi.binance.com/futures/data/openInterestHist?symbol=${sym}USDT&period=5m&limit=1`,
+                   9000
                 ),
                 getJson(
-                  `https://fapi.binance.com/fapi/v1/futures/data/globalLongShortAccountRatio?symbol=${sym}USDT&period=5m&limit=1`,
-                  6000
+                  `https://fapi.binance.com/futures/data/globalLongShortAccountRatio?symbol=${sym}USDT&period=5m&limit=1`,
+                   9000
                 ),
               ]);
               const h = (oi || [])[0] || {};
@@ -231,27 +267,98 @@ export class CryptoService {
             ethPct: d.market_cap_percentage?.eth,
           };
         }),
-        // 市值结构五币:单币市值/排行;占比前端用 cap ÷ global.totalUsd 现算
+        // 市值结构六币:单币市值/排行 + 24h/7d/30d 涨幅(一次 markets 调用全带,现货表直接查此表)。
+        // 顺带回 price/high/low/vol:币安/欧易都没有现货的币(如 BGB,仅 Bitget 本所交易)由前端用这些字段补行
+        // 占比前端用 cap ÷ global.totalUsd 现算
         safe(async () => {
-          const j = await getJson(
-            `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${DOM_IDS.join(',')}&order=market_cap_desc`
+          // CG 免费档偶发超时:fetchBest 同 URL 重一次,比整列空着强
+          const j = await fetchBest(
+            [`https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${DOM_IDS.join(',')}&order=market_cap_desc&price_change_percentage=24h,7d,30d,1y`],
+            (r: any) => r
           );
           const byId: Record<string, any> = {};
           for (const c of j || []) byId[c.id] = c;
-          return DOM_IDS.map(id => {
+          return (await Promise.all(DOM_IDS.map(async id => {
             const c = byId[id];
             return c
               ? {
+                  chg90: await chg90(id),
                   sym: DOM_SYM[id],
+                  price: c.current_price ?? null,
+                  high: c.high_24h ?? null,
+                  low: c.low_24h ?? null,
+                  quoteVol: c.total_volume ?? null,
                   cap: c.market_cap ?? null,
                   rank: c.market_cap_rank ?? null,
-                  chgPct: c.price_change_percentage_24h ?? null,
+                  chgPct: c.price_change_percentage_24h ?? c.price_change_percentage_24h_in_currency ?? null,
+                  chg7: c.price_change_percentage_7d ?? c.price_change_percentage_7d_in_currency ?? null,
+                  chg30: c.price_change_percentage_30d ?? c.price_change_percentage_30d_in_currency ?? null,
+                  chg1y: c.price_change_percentage_1y ?? c.price_change_percentage_1y_in_currency ?? null,
                 }
               : null;
-          }).filter(Boolean);
+          }))).filter(Boolean);
+        }),
+        // 币圈大盘指数(用户 2026-09-20 要求进首页币圈列):CMC100 = CoinMarketCap 官方免 key 端点,5min 级
+        safe(async () => {
+          const j = await getJson('https://pro-api.coinmarketcap.com/public-api/v3/index/cmc100-latest', 8000);
+          const d = j?.data;
+          if (!d || !isFinite(+d.value)) throw new Error('CMC100 免key端点无数据');
+          return { value: +d.value, chgPct: +d.value_24h_percentage_change, t: d.last_update };
+        }),
+        // CD20 = CoinDesk 20:CNBC 免 key 行情(.CD20);挂则落雅虎 ^CDI20(带 UA,否则 429)
+        safe(async () => {
+          const q: any =
+            (await getJson('https://quote.cnbc.com/quote-html-webservice/restQuote/symbolType/symbol?symbols=.CD20&requestMethod=itv&noform=1&partnerId=2&output=json', 8000))
+              ?.FormattedQuoteResult?.FormattedQuote?.[0] || {};
+          const v = parseFloat(String(q.last).replace(/,/g, ''));
+          if (isFinite(v) && q.last_time) return { value: v, chgPct: parseFloat(String(q['change_pct'])) || 0, t: q.last_timedate };
+          const y = (await getJson('https://query1.finance.yahoo.com/v8/finance/chart/%5ECDI20?range=5d&interval=1d', 8000, { 'User-Agent': 'Mozilla/5.0' }))
+            ?.chart?.result?.[0]?.meta;
+          if (!y || !isFinite(+y.regularMarketPrice)) throw new Error('CD20 CNBC 与雅虎均失败');
+          return { value: +y.regularMarketPrice, chgPct: +y.regularMarketChangePercent || 0, t: y.regularMarketTime };
+        }),
+        // BTC/ETH 近35日日线(总览改版 2026-09-20:板块①走势与②迷你 spark 共用)。
+        // vision 镜像免代理优先,挂回退国际站;klines 行[0]=开盘ms、[4]=收盘
+        safe(async () => {
+          const k = (sym: string) =>
+            fetchBest(
+              [
+                `https://data-api.binance.vision/api/v3/klines?symbol=${sym}&interval=1d&limit=35`,
+                `https://api.binance.com/api/v3/klines?symbol=${sym}&interval=1d&limit=35`,
+              ],
+              (r: any) => (r || []).map((x: any[]) => ({ t: new Date(+x[0]).toISOString().slice(0, 10), c: +x[4] }))
+            );
+          const [btc, eth] = await Promise.all([k('BTCUSDT'), k('ETHUSDT')]);
+          if (btc.length < 5 || eth.length < 5) throw new Error('币安日K不足');
+          return { btc, eth };
+        }),
+        // BTC.D 及其24h变化:CMC data-api 免key变体(pro-api 免key回500 busy,已实测)
+        safe(async () => {
+          const d = (await getJson('https://api.coinmarketcap.com/data-api/v3/global-metrics/quotes/latest', 8000))?.data;
+          if (!d || !isFinite(+d.btcDominance)) throw new Error('CMC 全球指标无数据');
+          return { btcD: +d.btcDominance, btcD24: +d.btcDominance24hPercentageChange || 0 };
+        }),
+        // 日涨幅(2026-09-21 用户要求,和 OKX App「日涨幅」对齐):OKX 公共日K bar=1D=北京0点开盘价现算,
+        // 与上面各源的「24h涨跌」(滚动24h)是两个口径,两列并存各自标明。逐币并发,单币挂只缺那格;全挂整槽 ✗
+        safe(async () => {
+          const out: Record<string, number> = {};
+          await Promise.all(
+            ['BTC', 'ETH', 'SOL', 'BNB', 'OKB'].map(async s => {
+              const j = await getJson(
+                `https://www.okx.com/api/v5/market/candles?instId=${s}-USDT&bar=1D&limit=1`,
+                6000
+              ).catch(() => null);
+              const v = okxDayPct(j?.data?.[0]);
+              if (v != null) out[s] = v;
+            })
+          );
+          if (!Object.keys(out).length) throw new Error('OKX 日K全失败');
+          return out;
         }),
       ]);
-      return { spot: { binance, okx }, fut: { binance: fut }, fng, global, dom };
+      // 日涨幅挂进现货行的 dayPct 字段(缺币不挂,前端显 —)
+      if (day.ok) for (const src of [binance, okx]) if (src.ok) for (const r of src.data as any[]) if (day.data[r.sym] != null) r.dayPct = day.data[r.sym];
+      return { spot: { binance, okx }, fut: { binance: fut }, fng, global, dom, bench: { cmc100, cd20 }, spark, domx };
     });
   }
 
@@ -318,6 +425,61 @@ export class CryptoService {
     });
   }
 
+  // ---------- 未平仓合约 OI 折线:各所 USDT 名义额历史(2026-09-22 用户要求,全平台趋势) ----------
+  // 口径逐所实测(2026-09-22):币安 openInterestHist 直接给 sumOpenInterestValue(USDT 名义);
+  // OKX rubik data 行 [ts, oi, vol],oi 为 USDT 名义(BTC≈33亿、SOL≈4亿,量级吻合;合约数口径会到几十亿 BTC,不可能);
+  // Bybit 只回币数 openInterest → 乘该所当前 markPrice 折 USDT(历史点用现价近似,页面注记)。
+  // Bitget v2 open-interest 只有当前单点、无历史(实测)→ 不做第 4 线;BGB 各主流所无永续,故不在本图币种里。
+  // 1d/7d 用 1h 档、30d 降 4h(限长:Binance≤500、Bybit≤200);OKX 恒 1H(单呼回 720 行=整 30 天)按窗口过滤。
+  async oiHistory(coin: string, range: string) {
+    const c = (coin || 'BTC').toUpperCase();
+    if (!OI_COINS.includes(c)) throw new Error('不支持的币种:' + c);
+    const r = ['1d', '7d', '30d'].includes(range) ? range : '7d';
+    const span = ({ '1d': 864e5, '7d': 7 * 864e5, '30d': 30 * 864e5 } as Record<string, number>)[r];
+    const per = r === '30d' ? '4h' : '1h';
+    return cached(`crypto:oi:${c}:${r}`, 60_000, async () => {
+      const since = Date.now() - span;
+      const asc = (a: any, b: any) => a.t - b.t;
+      const [binance, okx, bybit] = await Promise.all([
+        safe(async () => {
+          const j = await getJson(
+            `https://fapi.binance.com/futures/data/openInterestHist?symbol=${c}USDT&period=${per}&limit=500`
+          );
+          const rows = ((j || [])
+            .map((d: any) => ({ t: +d.timestamp, usd: +d.sumOpenInterestValue }))
+            .filter((x: any) => x.t >= since && isFinite(x.usd)) as any[]).sort(asc);
+          if (!rows.length) throw new Error('币安 OI 历史为空');
+          return rows;
+        }),
+        safe(async () => {
+          // rubik period 实测只支持 [5m,1H,1D](传 4H 回 51000),30d 也走 1H(单呼回 720 行=整 30 天),前端按桶合并
+          const j = await getJson(
+            `https://www.okx.com/api/v5/rubik/stat/contracts/open-interest-volume?ccy=${c}&period=1H`
+          );
+          const rows = ((j?.data || [])
+            .map((d: any) => ({ t: +d[0], usd: +d[1] }))
+            .filter((x: any) => x.t >= since && isFinite(x.usd)) as any[]).sort(asc);
+          if (!rows.length) throw new Error('OKX OI 历史为空');
+          return rows;
+        }),
+        safe(async () => {
+          const [oi, tk] = await Promise.all([
+            getJson(`https://api.bybit.com/v5/market/open-interest?category=linear&symbol=${c}USDT&intervalTime=${per}&limit=200`),
+            getJson(`https://api.bybit.com/v5/market/tickers?category=linear&symbol=${c}USDT`),
+          ]);
+          const px = +tk?.result?.list?.[0]?.markPrice;
+          if (!isFinite(px)) throw new Error('Bybit 标记价为空');
+          const rows = ((oi?.result?.list || [])
+            .map((d: any) => ({ t: +d.timestamp, usd: +d.openInterest * px }))
+            .filter((x: any) => x.t >= since && isFinite(x.usd)) as any[]).sort(asc);
+          if (!rows.length) throw new Error('Bybit OI 历史为空');
+          return rows;
+        }),
+      ]);
+      return { coin: c, range: r, series: { binance, okx, bybit } };
+    });
+  }
+
   // ---------- 相关新闻 & 宏观:Cointelegraph RSS(标题翻简体)----------
   async news() {
     return cached('crypto:news', 60_000, async () => {
@@ -349,6 +511,24 @@ export class CryptoService {
   }
 
   // ---------- 链上数据:稳定币总供给(DefiLlama)+ BTC 链上实时手续费(mempool)----------
+  // ④ 合约挂单量:重点币千档盘口快照(币安永续),逐币 {ok,data|error},60s 缓存
+  async book() {
+    return cached('crypto:book', 60_000, async () => {
+      const coins = ['BTC', 'ETH', 'SOL', 'BNB', 'XRP', 'DOGE'];
+      return Promise.all(
+        coins.map(async sym => {
+          try {
+            const v = bookCalc(await getJson(`https://fapi.binance.com/fapi/v1/depth?symbol=${sym}USDT&limit=1000`, 8000));
+            if (!v) throw new Error('空盘口');
+            return { sym, ok: true as const, data: v };
+          } catch (e: any) {
+            return { sym, ok: false as const, error: String(e?.message || e) };
+          }
+        })
+      );
+    });
+  }
+
   async chain() {
     return cached('crypto:chain', 60_000, async () => {
       // 稳定币 = 场外弹药:总供给与其 24h/7d 增减;rows 取头部发行方。真实"聪明钱"明细

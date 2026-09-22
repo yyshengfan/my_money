@@ -28,10 +28,16 @@ export class AuthService {
   @InjectEntityModel(Users, 'datasource1')
   usersRepo: Repository<Users>;
 
-  async login(username: string, password: string): Promise<string | null> {
-    const u = await this.usersRepo.findOne({ where: { username } });
-    if (!u || !verifyPassword(password, u.passHash)) return null;
-    (this.ctx as any).session.user = { username };
+  // 2026-09:全站开放登录——只有 tianhui 且密码正确是真账号,其余一律进「演示模式」
+  // (session.user.demo,数据 API 返回假持仓/假资产,见 service/demo.ts),永不返回 null
+  async login(username: string, password: string): Promise<string> {
+    let real = false;
+    // 忽略大小写(2026-09-21 修):MySQL 校对 ci 能找到行,JS 的 === 却会把 Tianhui 打成演示
+    if (username.toLowerCase() === 'tianhui') {
+      const u = await this.usersRepo.findOne({ where: { username } });
+      real = !!u && verifyPassword(password, u.passHash);
+    }
+    (this.ctx as any).session.user = { username, demo: !real };
     return username;
   }
 

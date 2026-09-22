@@ -1,0 +1,13 @@
+<!doctype html><meta charset="utf-8"><title>wait</title>
+<style>body{margin:0}iframe{width:393px;height:900px;border:0}</style>
+<iframe id="f" src="hub.html"></iframe>
+<script>
+const f = document.getElementById('f');
+f.onload = () => setTimeout(() => {
+  try {
+    const w = f.contentWindow, d = w.document;
+    const ev = d.querySelector('.events'); if (ev) w.scrollTo(0, ev.offsetTop);
+    document.title = JSON.stringify({ sw: d.documentElement.scrollWidth, cw: d.documentElement.clientWidth, rows: d.querySelectorAll('.evt').length });
+  } catch (e) { document.title = 'ERR ' + e.message; }
+}, 9000);
+</script>

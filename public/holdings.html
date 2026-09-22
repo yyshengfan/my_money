@@ -3,30 +3,238 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>股票持仓</title>
-<link rel="stylesheet" href="theme.css">
+<title>持仓总览</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="stylesheet" href="theme.css?v=20260921a">
 <style>
-  /* 页面私有样式;共用规格见 theme.css */
+  /* 页面私有样式;共用规格见 theme.css。
+     币圈=「持仓驾驶舱」(2026-09 v4,照用户参考图):渐变发光卡 + 总资产英雄区(隐藏金额👁)
+     + 资产分布环图 + 总资产走势(1D/7D/30D/1Y,OKX K线×当前持仓回溯估算)+ 今日收益排行
+     + 快捷外链 + 统一持仓列表(全部/现货/合约/理财 tabs + 搜索 + 隐藏小额 + 币种图标 + sparkline)。
+     股票面板保留 v2 复盘版式,经顶部 tab 切换,后续再改版。 */
   .tscroll{overflow-x:auto}
   table{width:100%;border-collapse:collapse;font-size:13px}
-  th{text-align:right;font:500 11px/1 var(--mono);letter-spacing:.05em;color:var(--ink-2);padding:11px 14px;border-bottom:1px solid var(--border);white-space:nowrap}
+  th{text-align:right;font:500 10.5px/1 var(--mono);letter-spacing:.06em;color:#5f6f80;padding:11px 14px 9px;border-bottom:1px solid var(--border);white-space:nowrap}
   th:first-child,td:first-child{text-align:left}
-  td{padding:11px 14px;border-bottom:1px solid #151c26;text-align:right;white-space:nowrap;font-family:var(--mono);font-variant-numeric:tabular-nums}
-  tr:last-child td{border-bottom:none}
-  td.nm{text-align:left}
-  td.nm b{font-family:var(--sans);font-weight:600}
-  td.nm .cd{color:var(--ink-2);font-size:11.5px;margin-left:8px}
-  .mk{font-size:10.5px;letter-spacing:.05em;color:var(--ink-2);border:1px solid var(--border);border-radius:999px;padding:3px 8px;margin-left:8px}
-  .pos{color:var(--up)} .neg{color:var(--down)} .err{color:var(--down)} .na{color:var(--ink-2)}
+  td{padding:10px 14px;text-align:right;white-space:nowrap;font-family:var(--mono);font-variant-numeric:tabular-nums}
+  td.nm{text-align:left;font-family:var(--sans)}
+  td.nm b{font-weight:600;font-size:13.5px}
+  td.nm .cd{color:#5f6f80;font-size:11.5px;margin-left:8px;font-family:var(--mono)}
+  .mk{font:500 10px/1 var(--mono);letter-spacing:.04em;color:#4a586a;margin-left:8px}
+  /* 涨跌配色全站统一绿涨红跌(2026-09 用户拍板,.pos=涨=绿/.neg=跌=红,与币圈 .cup/.cdn 同语义) */
+  .pos{color:var(--up)} .neg{color:var(--down)} .err{color:var(--down)} .na{color:#5f6f80}
+  tbody tr.main:hover td{background:#141b26}
+
+  /* 复盘行:与主行同组,组底一条 hairline(main 无后继 ana 时自己收底) */
+  tr.ana td{background:transparent;padding:1px 14px 11px;font:12px/1.5 var(--sans);color:#5f7186;text-align:left;border-bottom:1px solid #161f2a}
+  tr.ana .vt{color:#9db1c7;font-weight:500}
+  tr.ana.up .vt{color:#8fbaff} tr.ana.dn .vt{color:#ff9c9c}
+  tr.ana .facts{margin-left:12px;color:#556575}
+  tr.main:not(+ tr.ana) td{border-bottom:1px solid #161f2a}
+
+  /* 120 日区间位置条:数据可视化代替裸百分比(左=区间最低,右=120日最高,点=现价) */
+  .rng{display:inline-flex;align-items:center;gap:8px}
+  .rng .track{position:relative;width:64px;height:3px;border-radius:2px;background:#223041;flex:none}
+  .rng .dot{position:absolute;top:-2.5px;width:8px;height:8px;border-radius:50%;transform:translateX(-50%);background:#5f6f80}
+  .rng.hi .dot{background:var(--down)} .rng.lo .dot{background:var(--up)}
+  .rng b{font:500 11.5px/1 var(--mono);color:#5f6f80;width:30px;text-align:right}
+  .rng.hi b{color:var(--down)} .rng.lo b{color:var(--up)} /* 高位红/低位绿,同 A股习惯 */
+
+  /* 逻辑变化:无边框,圆点+字色;利好蓝、风险红、无变化灰——不占涨跌语义 */
+  .tg{display:inline-flex;align-items:center;gap:6px;font:500 12px/1 var(--sans);color:#5f6f80;white-space:nowrap}
+  .tg i{width:7px;height:7px;border-radius:50%;background:#3d4b5c;font-style:normal;flex:none}
+  .tg.good{color:#5ad1ff} .tg.good i{background:#5ad1ff}
+  .tg.risk{color:#ff8f8f} .tg.risk i{background:#ff8f8f}
+
+  /* 市场概况条 */
+  .mkl{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 16px;padding:12px 18px 2px;font-size:12.5px;color:#5f6f80}
+  .mkl .ix{display:inline-flex;align-items:baseline;gap:6px}
+  .mkl .ix b{font:600 12.5px/1 var(--mono)}
+  .mkl .meta b{color:var(--ink);font-weight:600}
+
+  /* 🎯 四类 + 📌 三选:同一套卡皮,标题 emoji 自带类别色相,不再各挂彩色左沿 */
+  .fgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:20px 18px 0}
+  .fcard,.dcard{border:1px solid var(--border);border-radius:12px;background:#0d131b;padding:12px 14px}
+  .fcard{min-height:96px}
+  .fcard h4{font:600 11.5px/1 var(--sans);letter-spacing:.02em;color:var(--ink);margin:0 0 10px}
+  .fitem{font-size:12.5px;line-height:1.45;margin:7px 0}
+  .fitem b{font-weight:600}
+  .fitem i{display:block;font-style:normal;font-size:11px;color:#5f6f80;margin-top:2px}
+  .fnone{color:#42505f;font-size:12px;padding-top:4px}
+  .dg{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:12px 18px 0}
+  .dcard i{display:block;font:500 10px/1 var(--mono);letter-spacing:.08em;color:#5f6f80;font-style:normal;margin-bottom:8px}
+  .dcard b{font:600 16px/1.3 var(--sans)}
+  .dcard p{font-size:11.5px;color:#5f6f80;margin-top:4px;line-height:1.5;white-space:normal}
+  .dgnote{margin:10px 18px 0}
+
+  /* ===== 顶部页签:币圈驾驶舱 / A股复盘(股票版式待改版) ===== */
+  .ptabs{display:flex;gap:8px;margin:14px 18px 2px}
+  .ptabs button{border:1px solid var(--border);background:#0d131b;color:#7f92a6;font:600 13px/1 var(--sans);padding:9px 18px;border-radius:99px;cursor:pointer}
+  .ptabs button.on{background:linear-gradient(135deg,#2f6bff,#1f4fd8);color:#fff;border-color:transparent;box-shadow:0 4px 18px rgba(47,107,255,.35)}
+
+  /* ===== 币圈驾驶舱 ===== */
+  .cry{padding-bottom:6px}
+  .chd{display:flex;align-items:flex-start;gap:14px;padding:16px 18px 0}
+  .chd h2{margin:0;font-size:21px;letter-spacing:.01em}
+  .chd .tag{margin:5px 0 0;font-size:12px;color:#5f6f80}
+  .chd .cmeta{margin-left:auto;text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+  .upt{font:11px/1 var(--mono);color:#4a586a}
+  /* 渐变发光卡(驾驶舱统一皮肤) */
+  .gcard{position:relative;border:1px solid #1b2635;border-radius:14px;overflow:hidden;padding:15px 18px;
+    background:radial-gradient(560px 190px at 88% -50%,rgba(79,140,255,.17),transparent 62%),
+               radial-gradient(360px 150px at 8% 130%,rgba(45,212,191,.05),transparent 60%),
+               linear-gradient(180deg,#101826,#0d131b)}
+  .gcard h4{font:600 13px/1 var(--sans);letter-spacing:.02em;color:var(--ink);margin:0 0 12px}
+  .cgrid{display:grid;grid-template-columns:1fr 348px;gap:14px;margin:16px 18px 0}
+  .cgrid2{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,.9fr) minmax(0,.72fr);gap:14px;margin:14px 18px 0}
+  /* KPI 英雄区 */
+  .kpi .kt{display:flex;align-items:center;gap:8px;font:500 11px/1 var(--sans);letter-spacing:.04em;color:#7f92a6}
+  .eye{margin-left:2px;border:0;background:none;color:#5f6f80;font-size:15px;cursor:pointer;line-height:1;padding:2px 4px;border-radius:6px}
+  .eye:hover{color:#9db1c7;background:#16202c}
+  .upill{margin-left:auto;display:flex;gap:2px;border:1px solid #1b2635;border-radius:8px;padding:2px;background:#0a1019}
+  .upill button{border:0;background:none;color:#5f6f80;font:600 11.5px/1 var(--mono);padding:4px 9px;border-radius:6px;cursor:pointer}
+  .upill button.on{background:#16202c;color:#9db1c7}
+  .kpi .kb{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.5fr);gap:12px;align-items:end;margin-top:12px}
+  .kbig b{display:block;font:700 40px/1.05 var(--mono);letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+  .kbig .sub{display:inline-flex;align-items:baseline;gap:10px;margin-top:9px;font:600 13.5px/1 var(--mono)}
+  .kcols{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+  .kc{border:1px solid #1b2635;border-radius:12px;padding:11px 13px;background:#0d1520;min-width:0}
+  .kc i{display:flex;align-items:baseline;justify-content:space-between;gap:6px;font:500 11px/1 var(--sans);color:#7f92a6;margin-bottom:11px;white-space:nowrap}
+  .kc i em{font-style:normal;font:600 11.5px/1 var(--mono);color:#5f6f80}
+  .kc b{display:block;font:600 16.5px/1.2 var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .kc span{display:block;font:11px/1.5 var(--mono);color:#5f6f80;margin-top:7px}
+    .kc span.dn2{color:#ff8f8f}
+  /* 子账号条(照参考图):标签 + 每户 chip(彩点+名+额) + 右端合计与「未计入总资产」注 */
+  .subbox{margin-top:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid #1b2635;border-radius:12px;padding:9px 12px;background:#0d1520}
+  .subbox:empty{display:none}
+  .sublab{display:inline-flex;align-items:center;gap:6px;font:600 12px/1 var(--sans);color:#c3d3e3;white-space:nowrap;border:1px solid #223040;background:#111c2a;border-radius:99px;padding:5px 11px}
+  .subchip{display:inline-flex;align-items:center;gap:7px;border:1px solid #223040;background:#111c2a;border-radius:99px;padding:5px 11px;font-size:11.5px;color:#7f92a6;white-space:nowrap}
+  .subchip u{width:6px;height:6px;border-radius:50%;background:#4f8cff;flex:none}
+  .subchip b{font:600 12px/1 var(--mono);color:#dbe7f5;font-variant-numeric:tabular-nums}
+  .subsum{margin-left:auto;display:inline-flex;align-items:baseline;gap:8px}
+  .subsum i{font-style:normal;font-size:11px;color:#5f6f80}
+  .subsum b{font:600 14.5px/1 var(--mono);font-variant-numeric:tabular-nums}
+  .subtag{font:500 10px/1 var(--sans);letter-spacing:.03em;color:#5f6f80;border:1px solid #22303f;border-radius:99px;padding:4px 9px;white-space:nowrap}
+  /* 资产分布环图 */
+  .drow{display:flex;align-items:center;gap:18px}
+  .dring{position:relative;width:148px;height:148px;border-radius:50%;flex:none;background:conic-gradient(#22303f 0 100%)}
+  .dring::after{content:'';position:absolute;inset:24px;border-radius:50%;background:#0d131b}
+  .dc{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;z-index:1}
+  .dc b{font:700 16px/1 var(--mono)}
+  .dc i{font-style:normal;font-size:10.5px;color:#5f6f80}
+  .dleg{flex:1;min-width:0;margin:0;padding:0;list-style:none}
+  .dleg li{display:flex;align-items:center;gap:8px;font-size:12.5px;padding:5.5px 0;color:#9db1c7}
+  .dleg li s{width:9px;height:9px;border-radius:50%;flex:none;text-decoration:none}
+  .dleg li b{margin-left:auto;font:600 12.5px/1 var(--mono);color:var(--ink)}
+  .dfoot{margin-top:10px;padding-top:10px;border-top:1px solid #172231;display:flex;align-items:center;justify-content:space-between;font-size:11.5px;color:#5f6f80}
+  /* 走势卡 */
+  .trh{display:flex;align-items:center;gap:12px}
+  .trh h4{margin:0}
+  .rp{margin-left:auto;display:flex;gap:2px;background:#0a1019;border:1px solid #1b2635;border-radius:9px;padding:3px}
+  .rp button{border:0;background:none;color:#7f92a6;font:600 11px/1 var(--sans);padding:5px 9px;border-radius:7px;cursor:pointer}
+  .rp button.on{background:#1e3a66;color:#cfe3ff}
+  .trb{display:flex;align-items:baseline;gap:10px;margin:12px 0 2px}
+  .trb b{font:700 24px/1 var(--mono);font-variant-numeric:tabular-nums}
+  .trb span{font:600 13px/1 var(--mono)}
+  .trc{position:relative;height:198px;margin-top:6px}
+  .trc svg{position:absolute;inset:0;width:100%;height:100%}
+  .trc .na{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+  .tagchip{position:absolute;transform:translate(-50%,-130%);background:#0f1c2c;border:1px solid #27405f;border-radius:7px;padding:4px 8px;font:600 11.5px/1 var(--mono);color:#cfe3ff;white-space:nowrap}
+  .axl{font:10px var(--mono);fill:#4a586a}
+  /* 今日收益排行 */
+  .rk .rrow{display:flex;align-items:center;gap:9px;padding:7.5px 0;border-bottom:1px solid #131c28;font-size:12.5px}
+  .rk .rrow:last-child{border-bottom:0}
+  .rk .rn{width:16px;font:600 11px/1 var(--mono);color:#5f6f80;flex:none}
+  .rk .rp2{margin-left:auto;font:600 12px/1 var(--mono)}
+  .rk .rpx{width:76px;text-align:right;font:11.5px/1 var(--mono);color:#5f6f80;flex:none}
+  .rk .none{color:#42505f;font-size:12px;padding:6px 0}
+  /* 快捷操作 */
+  .qg{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .qg a{display:flex;align-items:center;gap:9px;border:1px solid #1b2635;border-radius:11px;background:#0d1622;padding:11px 12px;font:600 12.5px/1 var(--sans);color:#c3d3e3;text-decoration:none}
+  .qg a:hover{border-color:#2f6bff;background:#12203a}
+  .qg .qi{width:26px;height:26px;border-radius:50%;background:#16273e;color:#5ad1ff;display:flex;align-items:center;justify-content:center;font-size:13px;flex:none}
+  .qn{margin:10px 0 0;font-size:10.5px;color:#4a586a;line-height:1.5}
+  /* 币种图标(单字母徽标;无外部图片依赖,品牌色映射,未知币按哈希取色) */
+  .ic{width:26px;height:26px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font:700 12px/1 var(--sans);color:#fff;flex:none;text-shadow:0 1px 2px rgba(0,0,0,.4)}
+  /* 统一持仓列表 */
+  .lst{margin:14px 18px 0;padding-bottom:8px}
+  .lsth{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .lsth h4{margin:0}
+  .ltabs{display:flex;gap:2px;background:#0a1019;border:1px solid #1b2635;border-radius:9px;padding:3px}
+  .ltabs button{border:0;background:none;color:#7f92a6;font:600 11.5px/1 var(--sans);padding:6px 12px;border-radius:7px;cursor:pointer}
+  .ltabs button.on{background:#1e3a66;color:#cfe3ff}
+  .lsth .grow{flex:1}
+  .lsth input#lq{background:#0a1019;border:1px solid #1b2635;border-radius:9px;color:var(--ink);font-size:12px;padding:7px 10px;width:150px;outline:none}
+  .lsth input#lq:focus{border-color:#2f6bff}
+  .lmin{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:#7f92a6;white-space:nowrap}
+  #cry-list tbody tr:hover td{background:#141b26}
+  #cry-list td{border-bottom:1px solid #131c28}
+  #cry-list .c1{display:flex;align-items:center;gap:9px;text-align:left}
+  #cry-list .c1 .t1{font:600 13px/1.15 var(--sans)}
+  #cry-list .c1 .t2{display:block;font:10.5px/1.2 var(--mono);color:#5f6f80;margin-top:3px}
+  .spark{vertical-align:middle}
+  .op a{color:#5ad1ff;font:600 12px/1 var(--sans);text-decoration:none}
+  .op a:hover{text-decoration:underline}
+  .cnote{margin:12px 18px 0;font-size:11px;color:#4a586a;line-height:1.6}
+  /* 隐藏金额(眼睛开关):#cry.mask 时所有 .money 打码 */
+  .money{font-variant-numeric:tabular-nums}
+  #cry.mask .money{filter:blur(6px);user-select:none}
+  /* 数据源:无边框,绿点=实时账户,灰点=台账 */
+  .src{display:inline-flex;align-items:center;gap:7px;font:500 11.5px/1 var(--sans);color:#5f6f80}
+  .src i{width:7px;height:7px;border-radius:50%;background:#3d4b5c;font-style:normal}
+  .src.live{color:#7fe0a8}.src.live i{background:var(--up);box-shadow:0 0 8px rgba(88,214,141,.7)}
+  .phead{display:flex;align-items:flex-start;gap:14px}
+  .phead .grow{flex:1;min-width:0}
+  /* FNG 迷你刻度(币圈语义:恐惧红→贪婪绿) */
+  .fng{display:inline-flex;align-items:center;gap:8px}
+  .fng .g{width:88px;height:4px;border-radius:2px;background:linear-gradient(90deg,#ff6b6b,#e8b34b,#58d68d);position:relative;flex:none;display:inline-block}
+  .fng .g u{position:absolute;top:-3px;width:4px;height:10px;border-radius:2px;background:#fff;transform:translateX(-50%)}
+  /* 币圈:绿涨红跌(与 A股表同语义,全站统一) */
+  .cup{color:var(--up)} .cdn{color:var(--down)}
+  .dir{font:600 10.5px/1 var(--sans);border-radius:5px;padding:2px 7px;margin-left:8px}
+  .dir.long{color:var(--up);background:rgba(88,214,141,.09)} .dir.short{color:var(--down);background:rgba(255,107,107,.09)}
+  .acct{font:500 10px/1 var(--sans);color:#e8b34b;background:rgba(232,179,75,.1);border-radius:5px;padding:2px 6px;margin-left:8px;vertical-align:2px}
+  .ktag{font:500 10px/1 var(--sans);color:#7ea4d8;background:rgba(79,140,255,.1);border-radius:5px;padding:2px 6px;margin-left:8px;vertical-align:2px}
+
+  /* 手机适配(≤640):驾驶舱降为单列,列表密度收紧 */
+  /* 641~1080 中间带(用户手机视口 ~690,勿只按 ≤640 适配):cgrid2 三列先并两列,cgrid 右侧 348px 定宽在 900 以下会挤没左栏(同合约挂单面板根因) */
+  @media(max-width:1080px){
+    .cgrid2{grid-template-columns:1fr 1fr}
+    .cgrid2 .tr{grid-column:1/-1}
+  }
+  @media(max-width:900px){.cgrid{grid-template-columns:1fr}}
+  @media(max-width:640px){
+    .tscroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+    table{font-size:12px}
+    th,td{padding:9px 10px}
+    tr.ana td{padding:0 10px 9px}
+    td.nm .cd{font-size:11px;margin-left:5px}
+    .mk{margin-left:5px}
+    .chd{padding:12px 12px 0}
+    .ptabs,.cgrid,.cgrid2,.lst,.cnote{margin-left:12px;margin-right:12px}
+    .cgrid{grid-template-columns:1fr}
+    .cgrid2{grid-template-columns:1fr}
+    .kpi .kb{grid-template-columns:1fr}
+    .kbig b{font-size:30px}
+    .kcols{grid-template-columns:1fr 1fr;gap:10px}
+    .drow{gap:12px}
+    .lsth .grow{display:none}
+    .lsth input#lq{width:110px;flex:1}
+    .fgrid{grid-template-columns:1fr 1fr;margin-top:14px}
+    .dg{grid-template-columns:1fr}
+    .mkl{padding:10px 12px 0;gap:5px 12px}
+    .fcard,.dcard{min-height:0}
+  }
+  @media(max-width:460px){.fgrid{grid-template-columns:1fr};.qg{grid-template-columns:1fr 1fr}}
 </style>
 </head>
 <body>
 <header>
-  <div class="brand"><span class="dot"></span><h1>股票持仓</h1></div>
+  <div class="brand"><span class="dot"></span><h1>持仓总览</h1></div>
   <nav>
     <a href="hub.html">总览</a>
-    <a href="stock.html">A股</a>
     <a href="crypto.html">币圈</a>
+    <a href="stock.html">A股</a>
     <a href="dashboard.html">我的财富<span class="lk">🔒</span></a>
     <a href="cashflow.html">流水<span class="lk">🔒</span></a>
     <a href="holdings.html">持仓<span class="lk">🔒</span></a>
@@ -36,13 +244,77 @@
 </header>
 <div class="status" id="status">加载持仓行情中…</div>
 
-<section class="panel">
-  <div class="phead"><div class="eyebrow">Holdings</div><h2>持仓总览</h2></div>
-  <div class="tscroll"><table id="tbl"></table></div>
+<div class="ptabs"><button id="tab-cry" class="on" type="button">币圈持仓</button><button id="tab-stk" type="button">A股 · 港股复盘</button></div>
+
+<!-- ============ 币圈持仓 · 驾驶舱 ============ -->
+<section class="panel" id="pan-cry">
+  <div class="cry" id="cry">
+    <div class="chd">
+      <div><div class="eyebrow">CRYPTO · OKX</div><h2>我的币圈持仓</h2><p class="tag">把握趋势,控制风险,长期复利</p></div>
+      <div class="cmeta"><span class="src" id="cry-src"><i></i>—</span><span class="upt" id="cry-upt"></span></div>
+    </div>
+    <div class="cgrid">
+      <div class="gcard kpi">
+        <div class="kt"><i id="kt-cur">总资产 (USDT)</i><button class="eye" id="eye" type="button" title="隐藏/显示金额">👁</button><span class="upill" id="unitp" title="切换显示币种(列表成本/价格/价值列不受影响,恒 USDT)"><button data-u="CNY" type="button">¥</button><button data-u="USD" type="button">$</button></span></div>
+        <div class="kb">
+          <div class="kbig"><b class="money" id="k-total">—</b><span class="sub" id="k-sub"></span></div>
+          <div class="kcols" id="k-cols"></div>
+          <div id="k-subacct" style="grid-column:1/-1"></div>
+        </div>
+      </div>
+      <div class="gcard dn">
+        <h4>资产分布</h4>
+        <div class="drow">
+          <div class="dring" id="d-ring"><div class="dc"><b class="money" id="d-total">—</b><i>总资产</i></div></div>
+          <ul class="dleg" id="d-leg"></ul>
+        </div>
+        <div class="dfoot"><span>市场情绪 · 恐慌贪婪</span><span id="d-fng">—</span></div>
+      </div>
+    </div>
+    <div class="cgrid2">
+      <div class="gcard tr">
+        <div class="trh"><h4>总资产走势</h4><div class="rp" id="rp"><button data-r="1d" class="on" type="button">1D</button><button data-r="7d" type="button">7D</button><button data-r="30d" type="button">30D</button><button data-r="1y" type="button">1Y</button></div></div>
+        <div class="trb"><b class="money" id="tr-v">—</b><span id="tr-p"></span></div>
+        <div class="trc" id="tr-svg"><span class="na">走势加载中…</span></div>
+      </div>
+      <div class="gcard rk"><h4>今日收益排行</h4><div id="rk"><span class="na">…</span></div></div>
+      <div class="gcard qk">
+        <h4>快捷操作</h4>
+        <div class="qg">
+          <a href="https://www.okx.com/zh-hans/trade-spot" target="_blank" rel="noopener"><span class="qi">⇄</span>交易</a>
+          <a href="https://www.okx.com/zh-hans/trade/transfer" target="_blank" rel="noopener"><span class="qi">⇥</span>划转</a>
+          <a href="https://www.okx.com/zh-hans/earn" target="_blank" rel="noopener"><span class="qi">◈</span>理财</a>
+          <a href="https://www.okx.com/zh-hans/hub/market/prices" target="_blank" rel="noopener"><span class="qi">◔</span>行情</a>
+        </div>
+        <p class="qn">本站为只读看板;充值/提现请前往 OKX 官方完成</p>
+      </div>
+    </div>
+    <div class="gcard lst">
+      <div class="lsth">
+        <h4>持仓列表</h4>
+        <div class="ltabs" id="ltabs"><button data-k="all" class="on" type="button">全部</button><button data-k="spot" type="button">现货</button><button data-k="fut" type="button">合约</button><button data-k="earn" type="button">理财</button></div>
+        <span class="grow"></span>
+        <input id="lq" type="search" placeholder="搜索币种/合约" autocomplete="off">
+        <label class="lmin"><input type="checkbox" id="lmin"> 隐藏小额资产</label>
+      </div>
+      <div class="tscroll" style="margin-top:8px"><table id="cry-list"></table></div>
+    </div>
+    <p class="cnote" id="cnote"></p>
+  </div>
 </section>
 
-<p class="foot">v1 框架:清单存 MySQL <code>holding</code> 表(增删直接改表),报价走腾讯免费行情(服务端 60s 缓存)。逐股新闻扫描、四类重点关注(超跌不坏/低位估值/改善未反映/逻辑风险)与飞书日报将在细化阶段接入(参考 holdings-recap + 妙想资讯)。</p>
-<script src="nav.js"></script>
-<script src="holdings.js"></script>
+<!-- ============ A股 · 港股(每日复盘,v2 版式;待改版) ============ -->
+<section class="panel" id="pan-stk" hidden>
+  <div class="phead"><div class="grow"><div class="eyebrow">A股 · 港股</div><h2>股票持仓 · 每日复盘</h2></div></div>
+  <div class="mkl" id="mkline"></div>
+  <div class="tscroll" style="margin-top:8px"><table id="tbl"></table></div>
+  <div class="fgrid" id="focus"></div>
+  <div class="dg" id="digest"></div>
+  <div class="na dgnote" id="dnote" style="font-size:11px"></div>
+</section>
+
+<p class="foot">股票清单存 MySQL <code>holding</code> 表(增删直接改表);复盘判定=腾讯 120 日K 本地算 MA/MACD/RSI/量能 + qt 的 PE/PB(服务端 60s 缓存),四类与总结为<b>技术面代理</b>(无免费逐票基本面/新闻源),只陈述指标事实、不构成投资建议。币圈优先读 OKX 只读账户(<code>~/.okx_apikey</code>,未配置时落回 <code>data/crypto_holdings.json</code> 手填台账 × 公开报价);总资产走势=OKX 公共K线 × <b>当前持仓数量</b>回溯估算(非历史真实净值,系统无每日快照);今日盈亏按 24h 涨跌对现货+理财折算,不含合约;成本单价取 OKX 加权成本(accAvgPx),转入/空投币交易所无成本记录则留空;理财的参考年化与累计收益为 OKX 侧原值。</p>
+<script src="nav.js?v=20260921a"></script>
+<script src="holdings.js?v=20260921a"></script>
 </body>
 </html>
