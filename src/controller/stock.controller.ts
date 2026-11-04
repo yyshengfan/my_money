@@ -1,6 +1,8 @@
 import { Controller, Get, Inject, Query } from '@midwayjs/core';
 import { AShareService } from '../service/market.service';
 import { MxService } from '../service/mx.service';
+import { HoldingService } from '../service/holding.service';
+import { cached } from '../util/net';
 
 // A股仪表盘(六块,全公开):数据来自 qt(腾讯,直连)+ 东财(涨跌家数/板块/涨停池/全A/资讯,走系统代理)。
 // 每端点 data 里的源统一为 {ok,data}|{ok:false,error}:单源失败只红对应卡,不白屏。
@@ -12,6 +14,9 @@ export class StockController {
 
   @Inject()
   mx: MxService;
+
+  @Inject()
+  holding: HoldingService;
 
   @Get('/market')
   async market() {
@@ -28,6 +33,7 @@ export class StockController {
           rows => ({ ok: true as const, data: rows }),
           (e: any) => ({ ok: false as const, error: String(e?.message || e) })
         ),
+        asOf: this.stock.boardsOkAt, // 最近成功采集时刻;距今>10min=限流回放,页面如实标日期(2026-10-20)
       },
     };
   }
@@ -71,6 +77,28 @@ export class StockController {
       (e: any) => ({ ok: false as const, error: String(e?.message || e) })
     );
     return { success: true, message: 'OK', data: { em } };
+  }
+
+  // 股票观察:固定清单(data/stock_watch.json)腾讯实时行情 + 前复权日K区间涨跌,60s 缓存
+  @Get('/watch')
+  async watch() {
+    const qt = await this.stock.watch().then(
+      d => ({ ok: true as const, data: d }),
+      (e: any) => ({ ok: false as const, error: String(e?.message || e) })
+    );
+    return { success: true, message: 'OK', data: { qt } };
+  }
+
+  // 持仓复盘(2026-10-28 用户要求并入股票观察面板,公开免登录:行只有标的/行情/技术事实,无数量成本价)
+  // analysis 内部是 qt fresh + 逐只日K 的重活,公开流量靠 cached()(数据分层自动抬至≥5min)+ 前端 SWR 吸收;
+  // ?fresh=1 手动刷新穿透。受保护的 /api/holding/analysis 原样保留(页面已不调用)
+  @Get('/recap')
+  async recap() {
+    const ana = await cached('stk:recap', 60_000, () => this.holding.analysis(false)).then(
+      d => ({ ok: true as const, data: d }),
+      (e: any) => ({ ok: false as const, error: String(e?.message || e) })
+    );
+    return { success: true, message: 'OK', data: { ana } };
   }
 
   // ③ 趋势投资派:东财候选 + 腾讯日K本地算指标(MA/MACD/RSI/量能),60s 缓存

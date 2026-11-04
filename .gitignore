@@ -7,3 +7,4 @@ data/moneyflow_daily.json
 data/stats.json
 data/events_daily.json
 data/crypto_holdings.json
+data/monitor_config.json

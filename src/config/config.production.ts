@@ -36,7 +36,7 @@ export default {
   },
   session: {
     key: 'my_money_sid',
-    maxAge: 24 * 3600 * 1000, // 24 小时(框架默认值,写明防歧义;rolling 未开=从登录时刻起算)
+    maxAge: 5 * 24 * 3600 * 1000, // 5 天(2026-10-16 用户要求;rolling 未开=从登录时刻起算)
     httpOnly: true,
     secure: true,
     sameSite: 'lax',

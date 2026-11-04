@@ -15,6 +15,7 @@ export interface QtRow {
   mcapYi?: number; // 总市值(亿元) f44;ETF=场内规模口径,基金观察用(2026-09-22);空/0 不写
   pe?: number;  // A股 f39(动态) / 港股 f51(TTM,亏损为负);指数 f39 是其整体 PE
   pb?: number;  // A股 f46;港股无可靠列,给不了(持仓页显示 —)
+  volRatio?: number; // 量比 f49(今日每分钟均量 ÷ 前5日每分钟均量);ETF 暴量监控用(2026-10-29)
 }
 
 // 腾讯免费行情 qt.gtimg.cn,免鉴权。每行形如:
@@ -46,6 +47,8 @@ export function parseTencent(text: string): Record<string, QtRow> {
     const fin = (x: any) => (isFinite(Number(x)) && Number(x) !== 0 ? Number(x) : undefined);
     if (m[1].startsWith('hk')) row.pe = fin(f[51]);
     else { row.pe = fin(f[39]); row.pb = fin(f[46]); }
+    const vr = f.length > 49 ? Number(f[49]) : NaN;
+    if (isFinite(vr) && vr > 0) row.volRatio = vr;
     out[m[1]] = row;
   }
   return out;

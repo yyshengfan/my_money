@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>我的财富</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
-<link rel="stylesheet" href="theme.css?v=20260921a">
+<link rel="stylesheet" href="theme.css?v=20261021a">
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
 <style>
   /* 页面私有样式;共用规格见 theme.css */
@@ -65,6 +65,42 @@
   .cats button.on{color:var(--ink);border-color:currentColor}
   .cdot{display:inline-block;width:7px;height:7px;border-radius:99px;margin-right:6px;vertical-align:1px}
 
+  /* 记一笔弹窗 */
+  #rec-mask{position:fixed;inset:0;background:rgba(4,7,11,.72);z-index:200;display:grid;place-items:center;padding:16px}
+  #rec-mask[hidden]{display:none}
+  .recbox{width:min(560px,100%);max-height:88vh;overflow:auto;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:18px}
+  .rechead{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+  .rechead h3{font-size:14px}
+  .recgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px 12px}
+  .recgrid label{display:grid;gap:4px;font:400 11px/1 var(--mono);color:var(--ink-2)}
+  .recgrid label.full{grid-column:1/-1}
+  .recgrid input{background:#0b1016;border:1px solid var(--border);border-radius:6px;color:var(--ink);font:500 13px/1 var(--mono);padding:8px 10px;min-width:0}
+  .recgrid input:focus{outline:none;border-color:#28476e}
+  .recfoot{display:flex;gap:10px;align-items:center;margin-top:16px}
+  .recbox button{font:500 12px/1 var(--mono);border-radius:999px;padding:9px 14px;cursor:pointer;background:transparent}
+  .recbox .ghost{color:var(--ink-2);border:1px solid var(--border)}
+  .recbox .go{color:var(--asset);border:1px solid #28476e}
+  .recbox .go:disabled{opacity:.5;cursor:default}
+  #rec-msg{font:400 11.5px/1.3 var(--mono);color:var(--ink-2);margin-left:auto;text-align:right}
+  #rec-msg.bad{color:var(--down)}
+
+  /* 理财盈亏总和(2026-09-30 用户加) */
+  .psctl{display:flex;gap:14px;align-items:center;flex-wrap:wrap;padding:10px 18px 0}
+  .psc{font:400 11px/1 var(--mono);color:var(--ink-2);display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+  .psc input{background:#0b1016;border:1px solid var(--border);border-radius:6px;color:var(--ink);font:500 12px/1 var(--mono);padding:5px 8px}
+  .psc button{font:500 11px/1 var(--mono);color:var(--asset);background:transparent;border:1px solid #28476e;border-radius:999px;padding:6px 12px;cursor:pointer}
+  .psum{display:grid;gap:10px 26px;padding:12px 18px 16px;align-items:center}
+  @media(min-width:900px){.psum{grid-template-columns:minmax(0,240px) 1fr}}
+  .ps-total{font:600 clamp(24px,3.4vw,32px)/1.2 var(--mono)}
+  .ps-cov{font:400 11px/1 var(--mono);color:var(--ink-2);margin-top:6px}
+  .psrows{display:grid;gap:7px;min-width:0}
+  .psrow{display:grid;grid-template-columns:72px minmax(0,1fr) 110px;gap:10px;align-items:center;font-size:12.5px}
+  .psrow .dot{width:8px;height:8px;border-radius:99px;display:inline-block;margin-right:8px}
+  .psrow .bar{height:6px;border-radius:3px;background:#161d27;overflow:hidden}
+  .psrow .bar i{display:block;height:100%;border-radius:3px}
+  .psrow.pos .bar i{background:var(--up)} .psrow.neg .bar i{background:var(--down)}
+  .psrow .pv{font:500 12px/1 var(--mono);text-align:right}
+
   /* 手机适配(≤640):hero 数字收敛、环形塌到列表上方、行距收紧 */
   @media(max-width:640px){
     .hero-main{padding:16px 14px}
@@ -76,7 +112,8 @@
     .chart{height:260px}
     .chart-tall{height:280px}
     .rrow{grid-template-columns:52px minmax(0,1fr) 74px 58px;gap:8px;padding-left:12px;padding-right:12px}
-    .rank,.cashstrip,.cats{padding-left:12px;padding-right:12px}
+    .rank,.cashstrip,.cats,.psctl,.psum{padding-left:12px;padding-right:12px}
+    .psrow{grid-template-columns:60px minmax(0,1fr) 96px;gap:8px;font-size:12px}
     .toggle{float:none;margin:6px 0 2px}
     .kpi{padding:13px 14px}
     .rrow .rv,.rrow .rp{font-size:11.5px}
@@ -93,6 +130,7 @@
     <a href="dashboard.html">我的财富<span class="lk">🔒</span></a>
     <a href="cashflow.html">流水<span class="lk">🔒</span></a>
     <a href="holdings.html">持仓<span class="lk">🔒</span></a>
+    <a href="monitor.html">监控<span class="lk">🔒</span></a>
   </nav>
   <div class="pills" id="range" aria-label="时间范围" title="全局时间窗(月/季/半年/年图与排行榜共用)">
     <button data-r="3">3M</button><button data-r="6">6M</button><button data-r="12" class="on">1Y</button><button data-r="36">3Y</button><button data-r="0">ALL</button>
@@ -100,6 +138,7 @@
   <div class="pills" id="gran" aria-label="统计粒度" title="图②③④的统计粒度(增量求和、金额取期末)">
     <button data-g="month" class="on">月</button><button data-g="quarter">季</button><button data-g="half">半年</button><button data-g="year">年</button>
   </div>
+  <div class="pills"><button id="newbtn" title="录入本月数据,创建最新记录">+ 记一笔</button></div>
   <div class="who" id="who"></div>
 </header>
 <div class="status" id="status">加载数据中…</div>
@@ -108,7 +147,7 @@
   <!-- 英雄区:总资产 = 视觉中心 -->
   <section class="hero">
     <div class="panel hero-main">
-      <div class="label">总资产 · 期末快照</div>
+      <div class="label" title="期末余额口径:零钱 + 理财总额 − 信用卡未还(收支表末笔记录)">总资产 · 期末余额</div>
       <div class="hero-total num" id="hero-total">—</div>
       <div class="hero-deltas">
         <div class="delta"><div class="dk" id="dk-inc">本期变化</div><div class="dv num" id="d-inc"></div></div>
@@ -140,18 +179,33 @@
     </section>
   </div>
 
-  <!-- 资产变化:默认总增量单柱,可展开小类堆叠 -->
-  <section class="panel">
-    <div class="phead"><div class="eyebrow">Period Delta</div><h2 id="delta-title">每月资产变化</h2></div>
-    <div class="toggle"><button id="stackbtn" aria-pressed="false">按小类堆叠</button></div>
-    <div class="chart-tall" id="delta"></div>
-  </section>
-
-  <!-- 收支与现金流 -->
+  <!-- 收支与现金流(2026-09-30 用户要求与理财盈亏块换序) -->
   <section class="panel">
     <div class="phead"><div class="eyebrow">Cashflow</div><h2>收支与余额</h2></div>
     <div class="cashstrip" id="cash-strip"></div>
     <div class="chart" id="cashflow"></div>
+  </section>
+
+  <!-- 理财盈亏变化:默认总量单柱,可展开小类堆叠 -->
+  <section class="panel">
+    <div class="phead"><div class="eyebrow">Period Delta</div><h2 id="delta-title">理财月盈亏</h2></div>
+    <div class="toggle"><button id="stackbtn" aria-pressed="false">按小类堆叠</button></div>
+    <div class="chart-tall" id="delta"></div>
+  </section>
+
+  <!-- 理财盈亏总和(2026-09-30 用户加):自带窗口选择,与全局时间窗/粒度无关 -->
+  <section class="panel">
+    <div class="phead"><div class="eyebrow">Profit Sum</div><h2>理财盈亏总和</h2></div>
+    <div class="psctl">
+      <div class="pills" id="psum" aria-label="统计区间" title="自选区间(不受上方时间窗/粒度影响)">
+        <button data-w="1m">近1月</button><button data-w="3m" class="on">近3月</button><button data-w="6m">近半年</button><button data-w="cur">本年</button><button data-w="12m">近1年</button><button data-w="custom">自定义</button>
+      </div>
+      <span class="psc" id="ps-custom" hidden>从 <input type="month" id="ps-from"> 至 <input type="month" id="ps-to"><button id="ps-go" type="button" title="应用所选起止月">确认</button></span>
+    </div>
+    <div class="psum">
+      <div class="psleft"><div class="ps-total num" id="ps-total">—</div><div class="ps-cov" id="ps-cov"></div></div>
+      <div class="psrows" id="ps-rows"></div>
+    </div>
   </section>
 
   <!-- 各小类明细趋势 -->
@@ -161,8 +215,21 @@
     <div class="chart" id="catdetail"></div>
   </section>
 </main>
-<script src="nav.js?v=20260921a"></script>
-<script src="dashboard.js"></script>
+
+<!-- 记一笔:弹窗录入 createNew 参数(字段清单由 dashboard.js 的 REC_FIELDS 渲染),POST /money/create -->
+<div id="rec-mask" hidden>
+  <div class="recbox" role="dialog" aria-modal="true" aria-labelledby="rec-title">
+    <div class="rechead"><h3 id="rec-title">记一笔 · 新记录</h3><button class="ghost" id="rec-x" aria-label="关闭">✕</button></div>
+    <div class="recgrid" id="rec-grid"></div>
+    <div class="recfoot">
+      <button class="go" id="rec-save">保存</button>
+      <button class="ghost" id="rec-cancel">取消</button>
+      <span id="rec-msg">快照时间记为当月月末</span>
+    </div>
+  </div>
+</div>
+<script src="nav.js?v=20261018a"></script>
+<script src="dashboard.js?v=20261030a"></script>
 <script>loadAndRender();</script>
 </body>
 </html>

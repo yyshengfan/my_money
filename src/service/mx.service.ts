@@ -3,6 +3,7 @@ import { readFileSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
 import { getJson, postJson, cached } from '../util/net';
+import { dedupeNews } from '../util/news';
 import { parseTencentKline, klineInd } from './market.service';
 
 /*
@@ -298,7 +299,8 @@ export class MxService {
       const rows = await cached('mx:news', 60_000, async () => {
         const j: any = await postJson(MX_NEWS, { query: NEWS_KW }, 45_000, { apikey: MX_OK });
         const list = j?.data?.data?.llmSearchResponse?.data || [];
-        const out = mxNewsRows(list).slice(0, 10);
+        // 检索结果常同事件多来源:时间倒序去重后取前 10
+        const out = dedupeNews(mxNewsRows(list).sort((a, b) => b.time.localeCompare(a.time))).slice(0, 10);
         if (!out.length) throw new Error('MX 资讯为空或不可解析');
         return out;
       });

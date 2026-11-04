@@ -18,6 +18,13 @@ export class Money {
   periodical: number | null;
 
   @Column("int", {
+    name: "periodical_deposit",
+    nullable: true,
+    comment: "零钱充值(充值为正、提取为负)",
+  })
+  periodicalDeposit: number | null;
+
+  @Column("int", {
     name: "periodical_increase",
     nullable: true,
     comment: "零钱增量",

@@ -2,7 +2,8 @@ import { Provide, Inject } from '@midwayjs/core';
 import { readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { getBuffer, getJson, cached } from '../util/net';
-import { QtService } from './qt.service';
+import { dedupeNews } from '../util/news';
+import { QtService, quoteCode } from './qt.service';
 
 /*
  * A股行情聚合:腾讯 qt(指数行情,直连)+ 东方财富(涨跌家数/板块/涨停池/全A列表/资讯,走系统代理)。
@@ -295,6 +296,30 @@ export function klineInd(bars: Array<{ c: number; h: number; v: number }>) {
   };
 }
 
+// 区间涨跌%(原在 holding.service,2026-10-14 挪来此处与股票观察 watch() 共用;holding.service re-export 保调用方/单测不动):
+// 每只 1/7/30/90/180/365 自然日(d1 为币圈列表追加,A股只用 d7+);基准=最后一根K日期往前 N 自然日内最后一个收盘价;
+// 现价优先用实时报价(盘中K末根可能滞后),取不到落K末根;历史不足该周期(次新股)回 null,不编数
+export function periodChg(rows: any[], priceNow: number | null) {
+  const bars = (rows || [])
+    .map((r: any) => ({ t: Date.parse(`${String(r?.[0])}T00:00:00`), c: +r?.[2] }))
+    .filter((b: any) => isFinite(b.t) && b.c > 0)
+    .sort((a: any, b: any) => a.t - b.t);
+  const last = bars[bars.length - 1];
+  const cur = priceNow && priceNow > 0 ? priceNow : last ? last.c : null;
+  const out: Record<string, number | null> = {};
+  for (const N of [1, 7, 30, 90, 180, 365]) {
+    let pct: number | null = null;
+    if (last && cur != null) {
+      const target = last.t - N * 864e5;
+      for (let i = bars.length - 1; i >= 0; i--) {
+        if (bars[i].t <= target) { pct = +((cur / bars[i].c - 1) * 100).toFixed(1); break; }
+      }
+    }
+    out[`d${N}`] = pct;
+  }
+  return out;
+}
+
 // ---------- 基金观察(A股页小模块,2026-09-22 用户要求) ----------
 // 源:东财 fundmobapi(免key无referer,实测直连)——
 //   区间收益 FundMNPeriodIncrease Datas[].{title,syl}:Z周/Y月/3Y季/1N年/3N三年/LN成立以来(均净值口径);成立不足3年 3N 为空 → 前端落 LN(成立以来)。
@@ -460,6 +485,10 @@ export class AShareService {
     });
   }
 
+  // 板块最近一次成功采集时刻(2026-10-20 东财 clist 路径级 502 调查后):cached 走缓存/故障回放时此值不变,
+  // 控制器 asOf 带出,页面据「距今>10min」如实标「限流回放·截至 HH:mm」
+  boardsOkAt = 0;
+
   // ② 板块行情 + ④ 资金同源:全行业板块分页拉回,排序交给前端 tab
   // ⚠️ 东财 clist 的 pz 硬上限 100(传 500 也只回 100 行,实测 2026-09-22):旧版单请求 pn=1 只拿到
   // 涨幅前 100(≈496 个行业的头部),跌幅榜只能在涨的里面挑「最不涨」——用户对照同花顺抓包。
@@ -484,6 +513,7 @@ export class AShareService {
       // 剔「Ⅲ」后缀三级行业(如 游戏Ⅲ/证券Ⅲ):与二级父板块成分大量重合、数值常雷同,会白占榜单席位
       const rows = diff.map(emBoardRow).filter((r: any) => r?.code && r?.name && !/Ⅲ$/.test(String(r.name)));
       if (!rows.length) throw new Error('板块列表为空');
+      this.boardsOkAt = Date.now(); // 只在真拉到数时更新;回放时不变=数据时刻
       return rows;
     });
   }
@@ -616,6 +646,42 @@ export class AShareService {
     });
   }
 
+  // 股票观察(2026-10-14 用户要求,参考基金观察):清单 data/stock_watch.json {code,name,cat?},60s 缓存。
+  // 现价/今日涨跌/PE/PB/高低/成交额/市值 = 腾讯 qt;7/30/90/180/365 日涨跌 = 前复权日K periodChg(含分红,与持仓复盘同口径)。
+  // 逐路失败只让对应字段回 null(前端显 —);类别 cat 省略时由前端纯函数 stkCat 按名称关键词兜底归类(排序逻辑与基金一致)。
+  async watch() {
+    return cached('stk:watch', 60_000, async () => {
+      const list = JSON.parse(readFileSync(join(process.cwd(), 'data', 'stock_watch.json'), 'utf8')) as
+        Array<{ code: string; name: string; cat?: string }>;
+      if (!Array.isArray(list) || !list.length) throw new Error('stock_watch.json 为空');
+      const tc = (code: string) => quoteCode(code, 'A股');
+      const qtm: any = await safe(async () => this.qtService.quotes(list.map(f => tc(f.code))));
+      const pcs = await Promise.all(list.map(f =>
+        safe(async () => {
+          const j: any = await getJson(
+            `https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param=${tc(f.code)},day,,,320,qfq`, 9000
+          );
+          const raw = j?.data?.[tc(f.code)]?.qfqday || j?.data?.[tc(f.code)]?.day || [];
+          if (!raw.length) throw new Error('日K为空');
+          return periodChg(raw, qtm.ok ? qtm.data[tc(f.code)]?.price ?? null : null);
+        })
+      ));
+      return list.map((f, i) => {
+        const q = qtm.ok ? qtm.data[tc(f.code)] : null;
+        const pc = (pcs[i] as any).ok ? (pcs[i] as any).data : null;
+        return {
+          code: f.code, name: f.name, cat: f.cat || null,
+          price: q && Number.isFinite(q.price) ? q.price : null,
+          day: q && Number.isFinite(q.chgPct) ? q.chgPct : null,
+          pe: q?.pe ?? null, pb: q?.pb ?? null,
+          amt: q && q.amountWan != null ? q.amountWan / 1e4 : null,
+          mcap: q && q.mcapYi != null ? q.mcapYi : null,
+          pc,
+        };
+      });
+    });
+  }
+
   // ④ 市场资金:涨停池(主力聚焦;连板/异动前端从 rows 派生)——板块资金 Top 前端复用 /boards 数据
   async flow() {
     return cached('stk:flow', 60_000, async () => {
@@ -738,7 +804,7 @@ export class AShareService {
         return ((j?.data?.list) || []).filter((x: any) => x?.title);
       };
       const seen = new Set<string>();
-      const rows: any[] = [];
+      let rows: any[] = [];
       for (const c of ['346', '353', '355']) {
         for (const x of await col(c)) {
           const key = x.code || x.title;
@@ -750,6 +816,9 @@ export class AShareService {
         if (rows.length >= 16) break;
       }
       if (!rows.length) throw new Error('资讯列表为空');
+      // 跨媒体近义改写去重(时间倒序=保留最新一条)
+      rows.sort((a: any, b: any) => String(b.showTime || '').localeCompare(String(a.showTime || '')));
+      rows = dedupeNews(rows);
       // 标题贴标签(仅展示位提示,不做真·影响对象分析——那需要内容理解/付费源)
       const tag = (t: string) =>
         /央行|证监会|国务院|发改委|财政部|国常会|外汇局|监管|部长|总理|政治局|中央金融/.test(t) ? '政策' :

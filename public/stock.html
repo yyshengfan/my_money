@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>大A股票</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
-<link rel="stylesheet" href="theme.css?v=20260921a">
+<link rel="stylesheet" href="theme.css?v=20261021a">
 <style>
   /* 页面私有样式;共用规格见 theme.css。涨跌配色全站统一:绿涨红跌(类名 rn=涨 gn=跌 沿旧命名,颜色已对调) */
   .rn{color:var(--up)} .gn{color:var(--down)}
@@ -184,6 +184,58 @@
   .ftab .xi{font-size:9.5px;color:var(--ink-2);margin-left:4px;font-weight:400}
   .tscroll{overflow-x:auto;-webkit-overflow-scrolling:touch} /* 窄屏基金表内横滑,≤900 首列吸附规格在 theme.css */
 
+  /* 持仓复盘并入统一表(2026-10-28,自 holdings.html 搬来):主行+简评行成一组,.ftab 行本有底边,
+     main 后跟 ana 时由 ana 收组底;悬停底色只给主行 */
+  .ftab tr.main:has(+ tr.ana) td{border-bottom:none}
+  .ftab tbody tr.main:hover td{background:#141b26}
+  .ftab tr.ana td{background:transparent;padding:1px 18px 11px;font:12px/1.5 var(--sans);color:#5f7186;text-align:left;border-bottom:1px solid #151c26}
+  .ftab tr.ana .vt{color:#9db1c7;font-weight:500}
+  .ftab tr.ana.up .vt{color:#8fbaff} .ftab tr.ana.dn .vt{color:#ff9c9c}
+  .ftab tr.ana .facts{margin-left:12px;color:#556575}
+  /* 高阶表(2026-10-28 用户「不易读,用高阶表格来做」):双行分组表头 + 点击排序 + 筛选 pills;
+     热底条在 td 内联 background(heatGrad,与监控阈值规同语系),无需类 */
+  .ftab thead tr.gh th{text-align:center;font:600 10px/1 var(--mono);letter-spacing:.14em;color:#5f7186;padding:4px 6px 2px;border-bottom:none;white-space:nowrap}
+  .ftab thead tr.gh th+th{border-left:1px solid #1c2531}
+  .ftab th.srt{cursor:pointer}
+  .ftab th.srt:hover{color:var(--ink)}
+  .ftab th.srt.on{color:#7fb0ff}
+  .ftab th.srt.on::after{content:' ▾';font-size:9px}
+  .ftab th.srt.on.asc::after{content:' ▴'}
+  .wfil{margin:14px 18px 6px;align-items:center}
+  .wfil .dim{margin-left:8px;font:400 11px/1 var(--mono)}
+  #watch .err{color:var(--down)}
+  /* 120 日区间位置条:数据可视化代替裸百分比(左=区间最低,右=120日最高,点=现价) */
+  .rng{display:inline-flex;align-items:center;gap:8px}
+  .rng .track{position:relative;width:64px;height:3px;border-radius:2px;background:#223041;flex:none}
+  .rng .dot{position:absolute;top:-2.5px;width:8px;height:8px;border-radius:50%;transform:translateX(-50%);background:#5f6f80}
+  .rng.hi .dot{background:var(--down)} .rng.lo .dot{background:var(--up)}
+  .rng b{font:500 11.5px/1 var(--mono);color:#5f6f80;width:30px;text-align:right}
+  .rng.hi b{color:var(--down)} .rng.lo b{color:var(--up)} /* 高位红/低位绿,同 A股习惯 */
+  /* 逻辑变化:无边框,圆点+字色;利好蓝、风险红、无变化灰——不占涨跌语义 */
+  .tg{display:inline-flex;align-items:center;gap:6px;font:500 12px/1 var(--sans);color:#5f6f80;white-space:nowrap}
+  .tg i{width:7px;height:7px;border-radius:50%;background:#3d4b5c;font-style:normal;flex:none}
+  .tg.good{color:#5ad1ff} .tg.good i{background:#5ad1ff}
+  .tg.risk{color:#ff8f8f} .tg.risk i{background:#ff8f8f}
+  /* 市场概况条 */
+  .mkl{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 16px;padding:12px 18px 2px;font-size:12.5px;color:#5f6f80}
+  .mkl .ix{display:inline-flex;align-items:baseline;gap:6px}
+  .mkl .ix b{font:600 12.5px/1 var(--mono)}
+  .mkl .meta b{color:var(--ink);font-weight:600}
+  /* 🎯 四类 + 📌 三选:同一套卡皮,标题 emoji 自带类别色相 */
+  .fgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:20px 18px 0}
+  .fcard,.dcard{border:1px solid var(--border);border-radius:12px;background:#0d131b;padding:12px 14px}
+  .fcard{min-height:96px}
+  .fcard h4{font:600 11.5px/1 var(--sans);letter-spacing:.02em;color:var(--ink);margin:0 0 10px}
+  .fitem{font-size:12.5px;line-height:1.45;margin:7px 0}
+  .fitem b{font-weight:600}
+  .fitem i{display:block;font-style:normal;font-size:11px;color:#5f6f80;margin-top:2px}
+  .fnone{color:#42505f;font-size:12px;padding-top:4px}
+  .dg{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:12px 18px 0}
+  .dcard i{display:block;font:500 10px/1 var(--mono);letter-spacing:.08em;color:#5f6f80;font-style:normal;margin-bottom:8px}
+  .dcard b{font:600 16px/1.3 var(--sans)}
+  .dcard p{font-size:11.5px;color:#5f6f80;margin-top:4px;line-height:1.5;white-space:normal}
+  .dgnote{margin:10px 18px 0}
+
   /* ⑥ 市场异动:三张擂台小卡 —— 名次圆牌(前三金/银/铜,复用 .rk)+ 徽标 + 名称 + 右对齐百分比 */
   #moves-body{padding:4px 14px 14px;display:grid;gap:12px}
   .mvcard{border:1px solid var(--border);border-radius:12px;background:linear-gradient(180deg,#101826,#0d131c);padding:6px 13px 8px;min-width:0}
@@ -212,7 +264,7 @@
 
   /* ⑤ 资讯 */
   .news{display:grid;align-content:start;padding:2px 18px 8px}
-  /* 资讯行改时间线编排(2026-09-20),行样式共用 theme.css .tl*;原 .nrow 系列已删 */
+  /* 资讯行改今日信号式滚动卡(2026-10-21),共用 theme.css .slw/.sln;旧 .nrow/.tl* 系列均已删 */
   .tchip{font:600 9.5px/1 var(--mono);padding:2.5px 6px;border-radius:4px;letter-spacing:.04em}
   .tc-policy{color:#7fb0ff;background:#132238} .tc-market{color:#ffd25e;background:#2a2413}
   .tc-company{color:#c8a2ff;background:#221433} .tc-news{color:#8b98a5;background:#161d28}
@@ -265,6 +317,14 @@
     .ftab th,.ftab td{padding:9px 10px}
     .ftab th:nth-child(2),.ftab td:nth-child(2){padding-right:4px}
     .ftab td.nm{max-width:118px}
+    .ftab tr.ana td{padding:0 12px 9px}
+    .ftab thead tr.gh th{letter-spacing:.04em;padding:3px 4px 2px}
+    .wfil{margin:12px 12px 4px}
+    .mkl{padding:10px 12px 2px;gap:5px 12px}
+    .fgrid{grid-template-columns:1fr 1fr;margin:14px 12px 0}
+    .dg{grid-template-columns:1fr;margin:10px 12px 0}
+    .fcard,.dcard{min-height:0}
+    .dgnote{margin:8px 12px 0}
     .brank{padding:10px 12px 2px}
     .brow{grid-template-columns:20px minmax(0,1fr) auto auto;gap:8px 10px;padding:8px 0}
     .brow.bhead{display:none}
@@ -276,6 +336,7 @@
     .opp .h{flex-wrap:wrap;row-gap:4px}
     .opp .mt{flex:1 1 100%;order:5}
   }
+  @media(max-width:460px){.fgrid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -288,6 +349,7 @@
     <a href="dashboard.html">我的财富<span class="lk">🔒</span></a>
     <a href="cashflow.html">流水<span class="lk">🔒</span></a>
     <a href="holdings.html">持仓<span class="lk">🔒</span></a>
+    <a href="monitor.html">监控<span class="lk">🔒</span></a>
   </nav>
   <div class="pills"><button id="refresh">刷新</button></div>
   <div class="who" id="who"></div>
@@ -308,6 +370,19 @@
     </div>
     <div class="src" id="src-mkt"></div>
     <div class="idxrow" id="idxrow"></div>
+  </section>
+
+  <!-- 股票观察 · 持仓复盘(2026-10-28 用户把持仓页 A股 tab 并入此面板,免登录):观察∪复盘按代码去重一张统一表,
+       后3列(分红/120日区/逻辑)与行下简评仅持仓行有值;版式/排序逻辑同基金观察(类别→名称) -->
+  <section class="panel" id="p-watch">
+    <div class="phead"><div class="eyebrow">固定自选 ∪ 持仓复盘 · 腾讯行情 · 区间涨跌=前复权日K(含分红) · 复盘=120日K技术面 · 免登录</div><h2>股票观察 · 持仓复盘</h2></div>
+    <div class="src" id="src-watch"></div>
+    <div class="mkl" id="mkline"></div>
+    <div id="watch"></div>
+    <div class="fgrid" id="focus"></div>
+    <div class="dg" id="digest"></div>
+    <div class="dim dgnote" id="dnote" style="font-size:11px"></div>
+    <div class="blk-note">现价/今日涨跌/PE/PB/市值/成交额为腾讯实时行情;7日~1年按前复权日K计算(现金分红已并入,与持仓页区间列同口径),历史不足该周期(次新股)显 —。PE 为动态市盈率(亏损为负)。分红/120日区/逻辑三列仅持仓标的有值(— = 观察标的,徽标「持仓」),持仓行下挂技术面简评;复盘清单=MySQL holding 表,判定为技术面代理,不构成投资建议。增删股票:编辑 data/stock_watch.json(6位代码,可选 cat=金融/电力/消费/材料/科技/医药/地产/其他,省略时按名称关键词归类)。</div>
   </section>
 
   <!-- 基金观察:固定清单表格(清单 data/fund_watch.json,一行一只),版式抄币圈「现货与市值」表;成立不足3年第三收益列落成立以来 -->
@@ -332,6 +407,7 @@
         <div class="colh">资金流向趋势 · 近 7 日折线(主力净额 + 沪深成交额)</div>
         <div class="src" id="src-trend"></div>
         <div id="trend-body"></div>
+        <div class="tkh">★ 资金要点</div>
         <div class="tkpts" id="trend-points"></div>
         <div class="blk-note" id="trend-note">上折线 = 近 7 个交易日主力净额(上证+深证成指合计,东财;时通时断期间由本地台账多路并试攒数,官方日线恢复自动回填整段)。下折线 = 沪深两市成交额逐日(东财官方日K回填 + 腾讯行情记当日,首个点起隔日成线)。北向净买入自 2024-08 官方停发,要点卡与右榜用仍每日发布的成交额(T-1)。</div>
       </div>
@@ -368,10 +444,10 @@
     <div class="oppnote" id="opp-note">口径:价值派=妙想MX基本面语义选股(连续5年ROE&gt;15%/毛利率&gt;30%/扣非连增/股息率/PE/PB/52周高点回撤),选出后另过腾讯日K「企稳回升」硬确认(站回MA20 且近20日涨幅&gt;0),每小时更新一次;趋势派=东财全A候选粗筛后拉腾讯前复权日K本地算 MA/MACD/RSI/量能,宁缺毋滥。chip <em>亮色圆点=达标、空心灰点=未达标、不显示=源缺该字段</em>;分数环为服务端 0~100 评分(≥65 金环)。<em>免费源覆盖不到、未纳入判定</em>:商誉/大股东质押/审计意见/应收增速四项一票否决、PE与PB近5年分位(按绝对值近似)、PEG、卖方一致预期、增持回购、板块20日涨幅与「板块内≥3只创60日新高」(以同行业入选≥2只+当日板块涨幅为代理);银行/地产/公用事业的负债率豁免未做。启发式筛选,非投资建议。</div>
   </section>
 
-  <!-- ⑤ 重要资讯 + ⑥ 市场异动 -->
+  <!-- ⑤ 重要资讯 + ⑥ 市场异动(2026-10-22 用户「原来的位置不要动」——资讯挪回此处原位;版式仍为今日信号式滚动卡) -->
   <div class="grid2">
     <section class="panel" id="p-news">
-      <div class="phead"><div class="eyebrow">政策 · 市场 · 公司</div><h2>重要资讯</h2></div>
+      <div class="phead"><div class="eyebrow">政策 · 市场 · 公司 · 圆点=重要程度(红 政策/盘面异动 · 琥珀 常规 · 灰 其他)· 上下滑动</div><h2>重要资讯</h2></div>
       <div class="src" id="src-news"></div>
       <div class="news" id="news"></div>
     </section>
@@ -384,8 +460,8 @@
 
   <p class="foot">数据源(免 key):指数行情/成交额来自腾讯 qt,涨跌家数、行业板块、涨停池、全A 排行与资讯来自东方财富公开接口;服务端缓存 60s。涨跌配色全站统一绿涨红跌。「今日机会」分两派:价值派走妙想 MX 基本面选股(免费基本面唯一源,盘中每小时一刷,东财不可用时资讯/机会兜底同理),趋势派由东财全A候选 + 腾讯日K 在服务端本地计算 MA/MACD/RSI/量能(腾讯行情走直连,不受东财限流影响);两派均为启发式评分,免费源覆盖不到的项(一票否决四项、5年估值分位、板块20日涨幅等)已在③卡注记列明,非投资建议。两市主力净额分时/日线取自东财 fflow 接口(深市经延迟镜像,日线仅沪市)。东方财富接口对本网络偶发限流,失败会在对应卡片标 ✗,过 1-2 分钟刷新即恢复;资讯「政策/市场/公司」标签仅为关键词粗分,非精准影响对象。妙想选股等增强源留待后续。</p>
 </main>
-<script src="nav.js?v=20260921a"></script>
-<script src="stock.js?v=20260922f"></script>
+<script src="nav.js?v=20261018a"></script>
+<script src="stock.js?v=20261029a"></script>
 <script src="stats.js?v=20260920d"></script>
 </body>
 </html>

@@ -104,6 +104,42 @@ function fundThird(r) {
   return v != null ? ['近3年', v] : ['成立以来', nn(r.ln)];
 }
 
+// 基金归类 + 表显示顺序(2026-10-14 用户要求「按基金类型和内容排序」):按基金名称关键词判,
+// fund_watch.json 无需新增字段、新加基金自动归位;显示序=核心宽基→行业进攻→红利攻守→海外分散→商品对冲→债券→未归类。
+// 判定顺序特意「具体→宽泛」:创业板人工智能 先中 AI 不会被「创业板」判成宽基;纳指100 先中海外不会被「100」判成宽基
+function fundCat(name) {
+  const s = String(name || '');
+  if (/黄金|原油|商品|有色/.test(s)) return '商品';
+  if (/纳指|纳斯达克|标普|道指|美国|日经|德国|法国|恒生|港股|中概|亚太|QDII/.test(s)) return '海外';
+  if (/红利|低波|股息|现金流/.test(s)) return '红利';
+  if (/债|货币/.test(s)) return '债券';
+  if (/半导体|芯片/.test(s)) return '半导体';
+  if (/人工智能|机器人|算力|软件|游戏|\bAI\b/.test(s)) return 'AI';
+  if (/沪深300|上证50|中证500|中证1000|中证2000|科创|创业板|深证100|A50|A100|A500/.test(s)) return '宽基';
+  return '其他';
+}
+const FUND_ORDER = ['宽基', '半导体', 'AI', '红利', '海外', '商品', '债券', '其他'];
+
+// 股票观察归类(2026-10-14 用户要求,排序逻辑与基金观察一致:类别→名称)。
+// 类别优先取 data/stock_watch.json 可选 cat(白名单外落其他);省略时按名称关键词兜底
+// (判定优先级:金融→医药→电力→科技→材料→地产→消费,与基金同类教训——先判专词防误伤)。
+function stkCat(name, cat) {
+  const c = String(cat || '');
+  if (c) return STOCK_ORDER.indexOf(c) >= 0 ? c : '其他';
+  const s = String(name || '');
+  if (/银行|保险|证券|信托|租赁|金融/.test(s)) return '金融';
+  if (/医|药|生物|基因/.test(s)) return '医药';
+  if (/电力|电网|核电|水电|风电|光伏|绿电|燃气/.test(s)) return '电力';
+  if (/石油|石化|海油|油气|煤矿?/.test(s)) return '能源';
+  if (/建筑|核建|中建|中铁|工程局/.test(s)) return '建筑';
+  if (/科技|电子|半导体|芯片|软件|计算机|通信|智能|数字|光电/.test(s)) return '科技';
+  if (/铝|铜|锌|镍|锂|稀土|钢|有色|化工|材料|水泥|矿业/.test(s)) return '材料';
+  if (/地产|房地产|置业/.test(s)) return '地产';
+  if (/食品|乳|伊利|蒙牛|酒|饮|服装|服饰|鞋|旅游|文旅|酒店|零售|百货|家电|汽车|农业/.test(s)) return '消费';
+  return '其他';
+}
+const STOCK_ORDER = ['金融', '电力', '能源', '建筑', '消费', '材料', '科技', '医药', '地产', '其他'];
+
 // 板块按当日涨幅榜:n>0 取涨 Top n(涨幅降序);n<0 取跌 Top |n|(跌幅最大在前);涨幅缺失剔除。不改动原数组
 function boardTop(rows, n = 5) {
   const s = (rows || []).filter(r => r && r.pct != null && Number.isFinite(+r.pct)).sort((a, b) => b.pct - a.pct);
@@ -132,6 +168,58 @@ function newsHeat(x) {
   return '';
 }
 
+// 板块回放时间注(2026-10-20 东财 502 调查后): boards 故障时回显最近一次成功数据,距今>10min 如实标采集时刻,宁缺勿假
+function asOfNote(ts, pre) {
+  if (!ts || Date.now() - ts <= 600e3) return '';
+  const d = new Date(ts);
+  const P = n => String(n).padStart(2, '0');
+  return `<span style="color:#d29a3a;font-size:11px;margin-right:6px">${pre || '东财限流中 ·'} 板块截至 ${P(d.getMonth() + 1)}-${P(d.getDate())} ${P(d.getHours())}:${P(d.getMinutes())} 回放</span>`;
+}
+
+// A股/港股现价货币前缀(2026-10-28 持仓复盘并入统一表,从 holdings.js 搬来):腾讯 qt 原值本币——
+// A股=人民币、港股=港币(市场名含「港」),复盘行现价不标单位会被当成美元
+function stkCur(m) {
+  return /港|hk/i.test(String(m || '')) ? 'HK$' : '¥';
+}
+
+// 统一表行合并(2026-10-28 用户把持仓复盘并入股票观察):watch 行为主、同码复盘行挂 r.hold(两清单实测仅3只重合);
+// holding-only 行折算成 watch 行形(day=chgPct、cat:null 走 stkCat 名称兜底)按 code 去重追加在后。任一参数可为 null
+function mergeRows(W, R) {
+  const rows = (W || []).slice();
+  const rmap = {};
+  for (const a of R || []) rmap[a.code] = a;
+  const seen = new Set();
+  for (const r of rows) {
+    const a = rmap[r.code];
+    if (a) { r.hold = a; seen.add(r.code); }
+  }
+  for (const a of R || []) {
+    if (seen.has(a.code)) continue;
+    rows.push({ code: a.code, name: a.name, cat: null, price: a.price, day: a.chgPct, pe: a.pe, pb: a.pb, mcap: a.mcap ?? null, amt: a.amt ?? null, pc: a.pc, hold: a });
+  }
+  return rows;
+}
+
+// ---- 高阶表助手(2026-10-28 用户「不易读,用高阶表格来做」):排序/筛选/列基线/热底,纯函数进 node 自检 ----
+const wCell = (r, k) =>
+  k === 'name' || k === 'code' ? String(r[k] || '') :
+    k === 'hold' ? (r.hold ? 1 : 0) :
+      /^d(7|30|90|180|365)$/.test(k) ? ((r.pc || {})[k] ?? null) : r[k];
+// 列排序:k='' 保持传入序(默认类别序);空值恒沉底(不随方向翻);同列再点靠 d 翻向
+function sortRows(rows, k, d) {
+  if (!k) return rows.slice();
+  const bad = v => v == null || (typeof v === 'number' && !Number.isFinite(v));
+  return rows.slice().sort((a, b) => {
+    const va = wCell(a, k), vb = wCell(b, k);
+    if (bad(va) && bad(vb)) return 0;
+    if (bad(va)) return 1;
+    if (bad(vb)) return -1;
+    return (typeof va === 'string' ? String(va).localeCompare(String(vb), 'zh') : va - vb) * d;
+  });
+}
+function filterRows(rows, f) {
+  return f === 'hold' ? rows.filter(r => r.hold) : f === 'watch' ? rows.filter(r => !r.hold) : rows.slice();
+}
 // ---------- 浏览器渲染 ----------
 if (typeof window !== 'undefined') {
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -304,8 +392,6 @@ if (typeof window !== 'undefined') {
     const nbChg = L && P && P.total ? ((L.total / P.total - 1) * 100) : null;
     const A = d.amt;
     const aChg = A && A.prev && A.today ? ((A.today / A.prev - 1) * 100) : null;
-    document.getElementById('trend-points').outerHTML =
-      `<div class="tkh">★ 资金要点</div><div class="tkpts" id="trend-points"></div>`;
     document.getElementById('trend-points').innerHTML =
       tk(sign > 0 ? `主力连续${run}日净流入` : sign < 0 ? `主力连续${run}日净流出` : '主力资金持平',
         fmtYi(runSum), sign >= 0 ? 'rn' : 'gn',
@@ -474,10 +560,10 @@ if (typeof window !== 'undefined') {
       <th title="24h(当日)最低成交价,仅场内">24h低</th>
       <th title="24h(当日)成交额,仅场内">成交额</th>
     </tr></thead><tbody>` +
-      res.data.map(r => {
+      res.data.slice().sort((a, b) => FUND_ORDER.indexOf(fundCat(a.name)) - FUND_ORDER.indexOf(fundCat(b.name)) || String(a.name).localeCompare(String(b.name), 'zh')).map(r => {
         const [t3l, t3v] = fundThird(r);
         return `<tr>
-          <td class="nm" title="${esc(r.name)}">${esc(r.name)}</td>
+          <td class="nm" title="${esc(r.name)}">${esc(r.name)}<span class="fx">${fundCat(r.name)}</span></td>
           <td>${esc(r.code)}<span class="fx${r.ex ? ' on' : ''}">${r.ex ? '场内' : '场外'}</span></td>
           <td>${fp(r.day)}${r.dayDate ? `<span class="xi">${esc(String(r.dayDate).slice(5))}</span>` : ''}</td>
           <td>${fp(r.r7d)}</td>
@@ -493,9 +579,138 @@ if (typeof window !== 'undefined') {
       }).join('') + '</tbody></table></div>';
   }
 
-  // ⑤ 重要资讯:东财优先,不可用时妙想 MX 兜底(均为中文,标题已贴标)
-  // 2026-09-20 用户要求按「时间线+重要程度」编排(样式抄首页事件雷达,共用 .tl 在 theme.css):
-  // 最新在前、按日分组挂日期头(今天/昨天/周X),节点空心刻度=newsHeat 级别(红圈政策异动/琥珀圈常规/灰点其他)
+  // ---------- 股票观察 · 持仓复盘(统一表) ----------
+  // 2026-10-28 用户把持仓页 A股 tab 并入此面板(免登录):watch∪复盘按代码去重一张 16 列表,
+  // 后 3 列(分红/120日区/逻辑)仅持仓行有值、观察行显 —;持仓行下挂简评 .main+.ana 组。
+  // RECAP/LASTW 两条数据流各自到达都重画一次;版式/排序同基金观察(.ftab + 类别→名称)
+  let RECAP = null, LASTW = null;
+  let WSORT = { k: '', d: -1 }, WFILT = 'all'; // 高阶表列排序态(d=-1 首点=降序)与筛选态
+  const sign2 = x => (x > 0 ? '+' : '') + Number(x).toFixed(2); // 复盘行涨跌额/概况百分比(自 holdings.js sign 搬来)
+  const rngBar = p => p == null ? '<span class="dim">—</span>'
+    : `<span class="rng ${p >= 66 ? 'hi' : p <= 33 ? 'lo' : ''}"><span class="track"><span class="dot" style="left:${Math.min(96, Math.max(4, p))}%"></span></span><b>${p.toFixed(0)}%</b></span>`;
+  const anaRow = a => !a.tech
+    ? `<tr class="ana"><td colspan="16"><span class="dim">✗ ${esc(a.error || '分析无数据')}</span></td></tr>`
+    : `<tr class="ana ${a.verdict.tone}"><td colspan="16">` +
+      `<span class="vt">${esc(a.verdict.text)}</span>` +
+      `<span class="facts">${[
+        a.tech.maBull && '均线多头',
+        a.tech.aboveMa20 ? '站上MA20' : (a.tech.ma20 != null ? 'MA20下方' : ''),
+        a.tech.macdUp && 'MACD偏多',
+        a.tech.newHigh60 && '60日新高',
+        a.tech.rsi != null && `RSI ${a.tech.rsi.toFixed(0)}`,
+        a.tech.vol5_60 != null && `量5/60 ${a.tech.vol5_60.toFixed(2)}×`,
+        a.tech.chg20 != null && `20日 ${a.tech.chg20 >= 0 ? '+' : ''}${a.tech.chg20.toFixed(1)}%`,
+        a.rs.dd != null && a.rs.dd >= 10 && `距高点 -${a.rs.dd.toFixed(0)}%`,
+      ].filter(Boolean).join(' · ')}</span></td></tr>`;
+
+  function renderWatch(res) {
+    LASTW = res;
+    const el = document.getElementById('watch');
+    const bd = { '腾讯行情': res };
+    if (RECAP) bd['持仓复盘'] = RECAP;
+    document.getElementById('src-watch').innerHTML = srcBadges(bd);
+    const all = mergeRows(res && res.ok ? res.data : null, RECAP && RECAP.ok ? RECAP.data.rows : null);
+    if (!all.length) {
+      el.innerHTML = `<div class="err">✗ 行情:${esc((res && res.error) || '不可用')};复盘:${esc((RECAP && RECAP.error) || '不可用')}——稍后自动重试</div>`;
+      return;
+    }
+    const fp2 = v => {
+      const p = p2(v);
+      return p == null ? '<span class="dim">—</span>' : `<span class="${p >= 0 ? 'rn' : 'gn'}">${p > 0 ? '+' : ''}${p.toFixed(2)}%</span>`;
+    };
+    const n2 = (v, d) => (v == null || !isFinite(v) ? '<span class="dim">—</span>' : v.toFixed(d));
+    const yi = v => (v == null || !isFinite(v) || v <= 0 ? '<span class="dim">—</span>' : `${v.toFixed(1)}亿`);
+    const na = '<span class="dim">—</span>';
+    const sh =(k, lb, t) => `<th class="srt${WSORT.k === k ? ' on' + (WSORT.d > 0 ? ' asc' : '') : ''}" data-k="${k}"${t ? ` title="${t} · 点击排序"` : ' title="点击排序"'}>${lb}</th>`;
+    let rows = filterRows(all, WFILT);
+    rows = WSORT.k ? sortRows(rows, WSORT.k, WSORT.d) : rows.sort((a, b) => STOCK_ORDER.indexOf(stkCat(a.name, a.cat)) - STOCK_ORDER.indexOf(stkCat(b.name, b.cat)) || String(a.name).localeCompare(String(b.name), 'zh'));
+    const nHold = all.filter(r => r.hold).length;
+    el.innerHTML = `<div class="pills wfil">` +
+      [['all', '全部', all.length], ['hold', '仅持仓', nHold], ['watch', '仅自选', all.length - nHold]].map(([f, lb, n]) =>
+        `<button type="button"${WFILT === f ? ' class="on"' : ''} data-f="${f}">${lb} ${n}</button>`).join('') +
+      `<span class="dim">点表头排序</span></div>` +
+      `<div class="tscroll"><table class="ftab"><thead><tr class="gh">` +
+      `<th colspan="2">标的</th><th colspan="2">今日行情</th>` +
+      `<th colspan="5" title="前复权日K,含分红">区间涨跌</th><th colspan="4">估值 · 规模</th>` +
+      `<th colspan="3" title="仅持仓行有值">持仓复盘</th></tr><tr>` +
+      sh('name', '股票名称') + sh('code', '代码') +
+      sh('price', '现价', '最新价(腾讯实时;持仓行悬停带涨跌额与行情时间)') +
+      sh('day', '今日涨跌', '今日涨跌幅(腾讯实时)') +
+      sh('d7', '7日', '近7个交易日(含分红)') + sh('d30', '30日', '近30日(含分红)') + sh('d90', '90日', '近90日(含分红)') +
+      sh('d180', '180日', '近180日(含分红)') + sh('d365', '1年', '近1年(含分红)') +
+      sh('pe', 'PE', '动态市盈率(亏损为负)') + sh('pb', 'PB', '市净率') + sh('mcap', '市值', '总市值(亿元)') + sh('amt', '成交额', '当日成交额(亿元)') +
+      `<th title="最新分红(东财分红送配报表,按除息日取最近一条):每10股税前派息·除息日·现价股息率;港股无此报表">分红</th>` +
+      `<th title="现价在 120 日高低区间的位置(技术面复盘用)">120日区</th>` +
+      `<th title="技术面逻辑变化:利好/风险/无变化(120日K规则判定)">逻辑</th>` +
+      `</tr></thead><tbody>` +
+      (rows.length ? rows.map(r => {
+        const pc = r.pc || {}, h = r.hold, div = h && h.div;
+        return `<tr class="main">
+          <td class="nm" title="${esc(r.name)}">${esc(r.name)}<span class="fx">${stkCat(r.name, r.cat)}</span>${h ? '<span class="fx on">持仓</span>' : ''}</td>
+          <td>${esc(r.code)}</td>
+          <td${h ? ` title="涨跌额 ${h.chg == null ? '—' : stkCur(h.market) + sign2(h.chg)} · 行情时间 ${esc(fmtQuoteTime(h.time))}"` : ''}>${n2(r.price, 2)}</td>
+          <td>${fp2(r.day)}</td>
+          <td>${fp2(pc.d7)}</td>
+          <td>${fp2(pc.d30)}</td>
+          <td>${fp2(pc.d90)}</td>
+          <td>${fp2(pc.d180)}</td>
+          <td>${fp2(pc.d365)}</td>
+          <td>${n2(r.pe, 1)}</td>
+          <td>${n2(r.pb, 2)}</td>
+          <td>${yi(r.mcap)}</td>
+          <td>${yi(r.amt)}</td>
+          <td${div ? ` title="${esc(div.full)} · 除息 ${div.ex} · 现价股息率 ${div.yl == null ? '—' : div.yl + '%'}"` : ''}>${div ? esc(div.plan) + `<span class="dim"> 除息${esc(String(div.ex).slice(5))}</span>` : na}</td>
+          <td>${h && h.tech ? rngBar(h.rs.pos) : na}</td>
+          <td>${h && h.tech ? `<span class="tg ${h.tag}" title="${esc(h.tagWhy)}"><i></i>${h.tag === 'good' ? '利好' : h.tag === 'risk' ? '风险' : '无变化'}</span>` : na}</td>
+        </tr>` + (h && (h.tech || h.error) ? anaRow(h) : '');
+      }).join('') : '<tr><td colspan="16" class="dim" style="text-align:center;padding:18px">该筛选下暂无标的</td></tr>') +
+      '</tbody></table></div>';
+  }
+
+  // 高阶表交互:表头排序 / 筛选 pills——委托在静态容器 #watch(innerHTML 重排不丢监听)
+  document.getElementById('watch').addEventListener('click', e => {
+    const th = e.target.closest('th.srt');
+    if (th) {
+      const k = th.getAttribute('data-k');
+      WSORT = WSORT.k === k ? { k, d: -WSORT.d } : { k, d: -1 };
+      renderWatch(LASTW); return;
+    }
+    const b = e.target.closest('.wfil button');
+    if (b) { WFILT = b.getAttribute('data-f'); renderWatch(LASTW); }
+  });
+
+  // 复盘信封落位:概况条 #mkline + 四类 #focus + 三选 #digest + 注记,然后重画统一表(复盘行并入 watch 表)。
+  // 失败/未到:四块清空、#dnote 如实挂原因(宁缺勿假);表照常画——观察行复盘三列显 —
+  function paintRecap(r) {
+    RECAP = r;
+    const mk = document.getElementById('mkline'), fg = document.getElementById('focus'),
+      dg = document.getElementById('digest'), dn = document.getElementById('dnote');
+    const d = r && r.ok && r.data;
+    if (d && d.overview) {
+      const ov = d.overview;
+      mk.innerHTML = ov.idx.map(i => `<span class="ix">${esc(i.n)} <b class="${aCls(i.pct)}">${i.pct == null ? '—' : sign2(i.pct) + '%'}</b></span>`).join('') +
+        `<span class="meta">持仓 <b class="rn">${ov.up}涨</b> <b class="gn">${ov.down}跌</b></span>` +
+        `<span class="meta">技术面实质变化 <b>${ov.changed}</b> 只 · 复盘 <b>${d.rows.length}</b> 只</span>`;
+      const f = d.focus, g = d.digest;
+      const card = (color, title, list) =>
+        `<div class="fcard ${color}"><h4>${title}</h4>` +
+        (list.length ? list.map(x => `<div class="fitem"><b>${esc(x.name)}</b><i>${esc(x.why)}</i></div>`).join('') : '<div class="fnone">— 暂无</div>') + '</div>';
+      fg.innerHTML = card('c-blue', '🎯 超跌不坏', f.oversold) + card('c-gold', '📉 历史低位估值', f.lowVal) +
+        card('c-green', '🔧 改善未反映', f.improve) + card('c-red', '⚠️ 逻辑风险', f.risk);
+      const dcard = (emoji, title, x, fb) =>
+        `<div class="dcard"><i>${emoji} ${title}</i>` + (x ? `<b>${esc(x.name)}</b><p>${esc(x.why || fb)}</p>` : '<b class="dim">无</b>') + '</div>';
+      dg.innerHTML = dcard('🟢', '最值得关注', g.best, '技术面强势') + dcard('🔴', '最需警惕', g.watch, '') + dcard('💰', '超跌最值得等待', g.wait, '');
+      dn.textContent = '四类与总结为技术面代理判定(无免费逐票基本面/新闻源),不构成投资建议;PE/PB 来自腾讯行情;复盘清单=MySQL holding 表。';
+    } else {
+      mk.innerHTML = ''; fg.innerHTML = ''; dg.innerHTML = '';
+      dn.textContent = r && !r.ok ? `✗ 复盘数据不可用:${String(r.error || '')}(稍后自动重试)` : '';
+    }
+    renderWatch(LASTW);
+  }
+
+  // 重要资讯(位置在页尾双栏⑤;2026-10-22 用户「原来的位置不要动」——10-21 曾上移已挪回,勿再挪):东财优先,MX 兜底(均为中文,标题已贴标)
+  // 2026-10-21 用户要求参考首页「今日信号」的设计、板块可上下滑动:圆点卡列表(.slw/.sln 在 theme.css),
+  // 级别=newsHeat(红大圈=政策/盘面异动,琥珀=常规,灰点=其他),时间进每行 meta、不再按日分组;放 20 条吃滚动。
   function renderNews(nw, mx) {
     const el = document.getElementById('news');
     const badges = { '东财资讯': nw };
@@ -505,28 +720,17 @@ if (typeof window !== 'undefined') {
     const act = useMx ? mx : nw;
     if (!act || !act.ok) { el.innerHTML = '<div class="err">✗ 资讯与妙想兜底均不可用</div>'; return; }
     const tc = { 政策: 'tc-policy', 市场: 'tc-market', 公司: 'tc-company', 要闻: 'tc-news' };
-    const pad = n => String(n).padStart(2, '0');
-    const dk = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-    const now = new Date(), today = dk(now), yest = dk(new Date(+now - 864e5));
-    const WD = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
     const rows = (act.data || []).slice()
       .sort((a, b) => String(b.time || '').localeCompare(String(a.time || '')))
-      .slice(0, 8);
-    let lastDay = '';
+      .slice(0, 20);
     el.innerHTML = (useMx ? `<div class="blk-note">东财不可用,当前为妙想 MX 兜底。</div>` : '') +
-      `<div class="tlkey"><span class="k-hi"><i></i>政策 / 盘面异动</span><span class="k-mid"><i></i>常规市场资讯</span><span class="k-lo"><i></i>其他</span></div>` +
-      '<div class="tl">' + rows.map(x => {
-        const d = String(x.time || '').slice(0, 10);
-        let hd = '';
-        if (d && d !== lastDay) {
-          lastDay = d;
-          hd = `<div class="tlday"><b>${esc(d.slice(5))}</b><span>${d === today ? ' · 今天' : d === yest ? ' · 昨天' : ''}</span>${/^\d{4}-\d{2}-\d{2}$/.test(d) ? `<i>${WD[new Date(d + 'T00:00:00').getDay()]}</i>` : ''}</div>`;
-        }
-        return hd + `<div class="tlr ${newsHeat(x)}"><span class="tdot"></span><div class="tlb">
+      '<div class="slw">' + rows.map(x => {
+        const d = String(x.time || '').slice(5, 16).replace('T', ' '); // MM-DD HH:mm
+        return `<div class="sln ${newsHeat(x)}"><i></i>
           ${x.url ? `<a class="tt" href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.title)}</a>` : `<span class="tt">${esc(x.title)}</span>`}
           ${x.summary ? `<div class="ds">${esc(x.summary)}</div>` : ''}
-          <div class="mt"><span class="tchip ${tc[x.tag] || 'tc-news'}">${x.tag || '要闻'}</span><span>${esc(x.media || '')}</span><span class="hm">${esc(String(x.time || '').slice(11, 16) || '—')}</span></div>
-        </div></div>`;
+          <div class="mt"><span class="tchip ${tc[x.tag] || 'tc-news'}">${x.tag || '要闻'}</span><span>${esc(x.media || '')}</span><span class="hm">${esc(d || '—')}</span></div>
+        </div>`;
       }).join('') + '</div>';
   }
 
@@ -576,6 +780,16 @@ if (typeof window !== 'undefined') {
     mv.innerHTML = cols.join('');
   }
 
+  // ② 板块数据装配:徽标 + 全局解析 + 行业分布/净流入榜两列(整页渲染与板块级刷新共用,2026-10-18 勿双实现)
+  function setBoards(boardsRes, asOf) {
+    document.getElementById('src-boards').innerHTML = srcBadges({ '东财板块': boardsRes }) + (boardsRes.ok ? asOfNote(asOf) : '');
+    boardFail = !boardsRes.ok;
+    boardRows = (boardsRes.ok && boardsRes.data) || [];
+    indPct = new Map(boardRows.filter(r => r.name).map(r => [r.name, r.pct]));
+    renderBoards();
+    renderNetIn();
+  }
+
   // 东财 clist(板块/机会/跌量榜)被限流时会变慢或失败,分批渲染 —— 先画 市场/涨停池/资讯,clist 好了再补 ②③⑥。
   async function loadAndRender() {
     const st = document.getElementById('status');
@@ -585,6 +799,9 @@ if (typeof window !== 'undefined') {
     get('/api/stock/value').then(j => renderValue((j && j.data && j.data.mx) || { ok: false, error: '接口不可达' }));
     // 基金观察:东财 fundmob + 腾讯 qt,不碰 clist → 同批并行,好了即画
     get('/api/stock/funds').then(j => renderFunds((j && j.data && j.data.em) || { ok: false, error: '接口不可达' }));
+    get('/api/stock/watch').then(j => renderWatch((j && j.data && j.data.qt) || { ok: false, error: '接口不可达' }));
+    // 持仓复盘(2026-10-28 并入):独立并发,paintRecap 落位时会连统一表一起重画,谁先到谁先出
+    get('/api/stock/recap').then(j => paintRecap((j && j.data && j.data.ana) || { ok: false, error: '接口不可达' }));
     // 趋势派复用 /opportunity 的 stk:opp 缓存 → 放在 jo 之后发,避免服务端并发打两遍 clist 触发限流
     // 第一批:不依赖 clist 的快源(指数/涨停池/资讯)→ 立即出画面
     const [jm, jf, jn, jmf] = await Promise.all([
@@ -604,12 +821,7 @@ if (typeof window !== 'undefined') {
     const oppD = (jo && jo.data) || {};
     const oppEm = oppD.em || { ok: false, error: '接口不可达' };
     const oppMx = oppD.mx || null;
-    document.getElementById('src-boards').innerHTML = srcBadges({ '东财板块': boardsRes });
-    boardFail = !boardsRes.ok;
-    boardRows = (boardsRes.ok && boardsRes.data) || [];
-    indPct = new Map(boardRows.filter(r => r.name).map(r => [r.name, r.pct]));
-    renderBoards();
-    renderNetIn();
+    setBoards(boardsRes, jb && jb.data && jb.data.asOf);
     renderMoves(oppEm, oppMx, poolRes); // 涨停池只喂 ⑥ 连板榜(④市场资金板块已下线)
     get('/api/stock/trend').then(j => renderTrendPicks((j && j.data && j.data.em) || { ok: false, error: '接口不可达' }));
 
@@ -621,6 +833,35 @@ if (typeof window !== 'undefined') {
   // SWR(nav.js v2):后台重取成功 → apifresh → 自动重渲替换;手动刷新置 __apibust 无视本地缓存直连
   document.getElementById('refresh').onclick = () => { window.__apibust = Date.now(); loadAndRender(); };
   window.addEventListener('apifresh', loadAndRender);
+
+  // 板块级刷新(2026-10-18 用户要求,nav.js 依此表在板块右上角挂 ⟳):只重取本板块用到的源、只重渲本板块
+  const BAD = { ok: false, error: '接口不可达' };
+  window.panelRef = {
+    'p-mkt': async () => { const j = await panelFetch('/api/stock/market'); renderMarket((j && j.data) || {}); },
+    'p-watch': async () => { // 观察 + 复盘两路并发(panelFetch=直连 fresh,穿透服务端缓存与 SWR)
+      const [j, jr] = await Promise.all([panelFetch('/api/stock/watch'), panelFetch('/api/stock/recap')]);
+      renderWatch((j && j.data && j.data.qt) || BAD);
+      paintRecap((jr && jr.data && jr.data.ana) || BAD);
+    },
+    'p-funds': async () => { const j = await panelFetch('/api/stock/funds'); renderFunds((j && j.data && j.data.em) || BAD); },
+    'p-boards': async () => { // ② 三列:行业分布/净流入榜=东财 boards;趋势+北向=moneyflow(本地台账多路)
+      const [jb, jmf] = await Promise.all([panelFetch('/api/stock/boards'), panelFetch('/api/stock/moneyflow')]);
+      const mfd = (jmf && jmf.data) || {};
+      renderTrend(mfd.em || BAD, mfd.nb || null); renderNorth(mfd.nb || BAD);
+      setBoards((jb && jb.data && jb.data.em) || BAD, jb && jb.data && jb.data.asOf);
+    },
+    'p-opp': async () => { // ③ 两派:价值=MX 语义选股,趋势=候选+腾讯日K本地算
+      const [jv, jt] = await Promise.all([panelFetch('/api/stock/value'), panelFetch('/api/stock/trend')]);
+      renderValue((jv && jv.data && jv.data.mx) || BAD);
+      renderTrendPicks((jt && jt.data && jt.data.em) || BAD);
+    },
+    'p-news': async () => { const jn = await panelFetch('/api/stock/news'); const nd = (jn && jn.data) || {}; renderNews(nd.em || BAD, nd.mx || null); },
+    'p-moves': async () => { // ⑥ 连板/跌幅/放量:全A排行=opportunity,涨停池=flow
+      const [jo, jf] = await Promise.all([panelFetch('/api/stock/opportunity'), panelFetch('/api/stock/flow')]);
+      const od = (jo && jo.data) || {};
+      renderMoves(od.em || BAD, od.mx || null, (jf && jf.data && jf.data.pool) || BAD);
+    },
+  };
   loadAndRender(); // 块内定义并自调用;勿在 HTML 尾部再加 <script>loadAndRender()</script>
 }
 
@@ -653,6 +894,16 @@ function selftest() {
   A(fundThird({ r3y: 14.26, ln: 173.06 })[0] === '近3年', '基金满3年→近3年');
   const fYoung = fundThird({ r3y: '', ln: 173.06 });
   A(fYoung[0] === '成立以来' && fYoung[1] === 173.06, '基金不足3年→成立以来');
+  // 基金归类(2026-10-14 用户「按类型和内容排序」,不懂基金→规则由代码判):具体先判防误归
+  A(fundCat('黄金ETF华安') === '商品' && fundCat('纳指100ETF国泰') === '海外' && fundCat('标普500ETF博时') === '海外', '基金归类·商品/海外');
+  A(fundCat('富国中证红利指数增强A') === '红利' && fundCat('红利低波50ETF南方') === '红利', '基金归类·红利(增强A不误判AI)');
+  A(fundCat('创业板人工智能ETF南方') === 'AI' && fundCat('半导体ETF国泰') === '半导体', '基金归类·行业先于宽基');
+  A(fundCat('科创50ETF华夏') === '宽基' && fundCat('沪深300ETF华泰柏瑞') === '宽基' && fundCat('某新主题基金') === '其他', '基金归类·宽基/其他');
+  A(FUND_ORDER.indexOf(fundCat('黄金ETF华安')) > FUND_ORDER.indexOf(fundCat('沪深300ETF华泰柏瑞')), '显示序·宽基在前商品在后');
+  A(stkCat('中国银行', '金融') === '金融' && stkCat('某某控股', '稀土') === '其他', '股票归类·cat 白名单(cat 只认 STOCK_ORDER,未知落其他)');
+  A(stkCat('华能电力') === '电力' && stkCat('南山铝业') === '材料' && stkCat('西安旅游') === '消费' && stkCat('寒武纪科技') === '科技', '股票归类·名称关键词兜底');
+  A(stkCat('中国海油') === '能源' && stkCat('中国核建') === '建筑' && stkCat('中国核电') === '电力', '股票归类·能源/建筑(核电≠核建 关键词各归各位)');
+  A(STOCK_ORDER.indexOf(stkCat('工商银行')) < STOCK_ORDER.indexOf(stkCat('某某科技')), '显示序·金融在前科技在后(同基金:类别→名称)');
   A(fundThird({ r3y: null, ln: null })[1] === null, '基金双缺→null显示—');
   const tc = trendChips({ turn: 8, mainNet: 2.1e8, sameInd: 3, tech: { maBull: true, macdUp: true, newHigh60: false, vol5_60: 1.8, rsi: 61, chg20: 18 } });
   A(tc.length === 9 && tc[0][2] === true && tc.find(x => x[0] === '60日新高')[2] === false && tc[8][0] === '板块共振', '趋势派 9 chips/共振附加');
@@ -677,6 +928,32 @@ function selftest() {
   A(newsHeat({ title: '央行宣布降准', summary: '' }) === 'hi', '降准→hi');
   A(newsHeat({ title: '某股东减持', summary: '' }) === 'mid', '减持→mid');
   A(newsHeat({ title: '', summary: '' }) === '', '空文本→默认级');
+
+  // 板块回放时间注(2026-10-20):新鲜/缺失→空串;>10min→琥珀注记带 MM-DD HH:mm
+  A(asOfNote(Date.now() - 60e3) === '' && asOfNote(0) === '', '回放注·新鲜不标');
+  A(/东财限流[\s\S]*\d\d-\d\d \d\d:\d\d 回放/.test(asOfNote(Date.now() - 3600e3)), '回放注·旧数据如实标时刻');
+
+  // 持仓复盘并入统一表(2026-10-28):货币前缀 + 合并去重
+  A(stkCur('A股·沪') === '¥' && stkCur('港股') === 'HK$' && stkCur('HK') === 'HK$' && stkCur() === '¥', 'stkCur 货币前缀');
+  const f1 = [{ code: '601985', name: '中国核电', cat: '电力' }, { code: '600219', name: '南山铝业' }];
+  const f2 = [{ code: '601985', name: '中国核电', market: 'A股·沪', price: 10, chgPct: 1 }, { code: '000516', name: '国际医学', market: 'A股·深', price: 5, chgPct: -1, pc: { d7: 2 } }];
+  const mM = mergeRows(f1, f2);
+  A(mM.length === 3 && !!mM[0].hold, 'mergeRows 同码挂 hold、去重成 3 行');
+  A(mM[2].code === '000516' && mM[2].cat === null && mM[2].day === -1 && mM[2].pc.d7 === 2, 'mergeRows 复盘独行折算行形(day=chgPct)');
+  A(mergeRows([{ code: '601988', name: '中国银行' }], null).every(x => !x.hold), 'mergeRows 复盘缺→原样观察表');
+  const only = mergeRows(null, [{ code: '000610', name: '西安旅游', price: 3, chgPct: 0.5 }]);
+  A(only.length === 1 && only[0].day === 0.5 && !!only[0].hold, 'mergeRows 观察缺→复盘独表');
+
+  // 高阶表(2026-10-28 用户「不易读,用高阶表格」):排序/筛选/基线/热底
+  {
+    const rs = [{ name: 'b', code: '2', price: 1, pc: { d7: 5 } }, { name: 'a', code: '1', price: null }, { name: 'c', code: '3', price: 3, hold: { x: 1 } }];
+    A(sortRows(rs, 'price', -1).map(r => r.name).join() === 'c,b,a', 'sortRows 数值降序、null 恒沉底');
+    A(sortRows(rs, 'price', 1).map(r => r.name).join() === 'b,c,a', 'sortRows 同列再点=升序(null 仍沉底)');
+    A(sortRows(rs, 'name', 1).map(r => r.name).join() === 'a,b,c', 'sortRows 名称升序');
+    A(sortRows(rs, 'd7', -1).map(r => r.name).join() === 'b,a,c', 'sortRows 区间列取 r.pc');
+    A(sortRows(rs, '', -1).length === 3 && sortRows(rs, '', -1)[0].name === 'b', 'sortRows k="" 保持传入序');
+    A(filterRows(rs, 'hold').length === 1 && filterRows(rs, 'watch').length === 2 && filterRows(rs, 'all').length === 3, 'filterRows 全部/仅持仓/仅自选');
+  }
 
   console.log('stock.js selftest OK');
 }

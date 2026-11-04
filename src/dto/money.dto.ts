@@ -27,6 +27,19 @@ export class MoneyDTO {
   outmoneySocialSecurity: number;
   @Rule(RuleType.number().max(999999999).required())
   hkStock: number;
+  // 充值/提取(2026-09-30 用户加):充值为正、提取为负;可选、缺省 0,老调用方不传也能记
+  @Rule(RuleType.number().min(-999999999).max(999999999).optional().default(0))
+  fundDeposit: number;
+  @Rule(RuleType.number().min(-999999999).max(999999999).optional().default(0))
+  bitDeposit: number;
+  @Rule(RuleType.number().min(-999999999).max(999999999).optional().default(0))
+  stockDeposit: number;
+  @Rule(RuleType.number().min(-999999999).max(999999999).optional().default(0))
+  zfbDeposit: number;
+  @Rule(RuleType.number().min(-999999999).max(999999999).optional().default(0))
+  hkStockDeposit: number;
+  @Rule(RuleType.number().min(-999999999).max(999999999).optional().default(0))
+  periodicalDeposit: number;
   @Rule(RuleType.string().trim().max(255).required())
   comment: string;
 }

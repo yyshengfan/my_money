@@ -122,16 +122,20 @@ function evAssets(e) {
   return EV_ORD.filter(k => a[k]).slice(0, 4).map(k => ({ n: k, lv: a[k] }));
 }
 // 同币种、与组内最后一条相差 ≤40min 的事件并为一组(数据升序传入):主条=高危+关键指标词优先,资产取组内各条最大强度
+// 2026-11-02 修:按「该币种自己的上一组」判合并,不认数组末条 —— 同时刻多币种交错(11-06 21:30 失业率/CAD就业/非农)
+// 曾把美国那一串切成两行,非农被埋在中间
 function groupEvents(evts) {
-  const gs = [];
+  const gs = [], byC = {};
   (evts || []).forEach(e => {
-    const g = gs[gs.length - 1];
-    if (g && g.country === e.country && e.ts - g.end <= 40 * 6e4) { g.items.push(e); g.end = e.ts; if (e.impact === 'H') g.impact = 'H'; }
-    else gs.push({ ts: e.ts, end: e.ts, day: e.day, hh: e.hh, country: e.country, impact: e.impact, items: [e] });
+    const g = byC[e.country];
+    if (g && e.ts - g.end <= 40 * 6e4) { g.items.push(e); g.end = e.ts; if (e.impact === 'H') g.impact = 'H'; }
+    else { const ng = { ts: e.ts, end: e.ts, day: e.day, hh: e.hh, country: e.country, impact: e.impact, items: [e] }; gs.push(ng); byC[e.country] = ng; }
   });
+  gs.sort((a, b) => a.ts - b.ts); // 合并后仍按时间排(上面按币种归组会打乱原序)
   const RE_KEY = /rate|decision|statement|cpi|ppi|gdp|claims|sales|employment/i;
+  const NFP = /non-?farm|payroll/i; // 非农 > 同场的失业率/时薪当主条(用户点名要看这个)
   gs.forEach(g => {
-    g.main = g.items.slice().sort((a, b) => ((b.impact === 'H') - (a.impact === 'H')) || ((RE_KEY.test(b.en || '') - RE_KEY.test(a.en || '')) || (a.title || '').length - (b.title || '').length))[0];
+    g.main = g.items.slice().sort((a, b) => ((b.impact === 'H') - (a.impact === 'H')) || ((NFP.test(b.en || '') - NFP.test(a.en || ''))) || ((RE_KEY.test(b.en || '') - RE_KEY.test(a.en || '')) || (a.title || '').length - (b.title || '').length))[0];
     g.title = g.main.title;
     const am = {};
     g.items.forEach(e => evAssets(e).forEach(x => { am[x.n] = Math.max(am[x.n] || 0, x.lv); }));
@@ -151,6 +155,24 @@ function fmtLeft(ms) {
   const p = n => String(n).padStart(2, '0');
   const s = Math.floor(ms / 1000), d = Math.floor(s / 86400), hh = Math.floor((s % 86400) / 3600), mm = Math.floor((s % 3600) / 60);
   return d ? `${p(d)}天 ${p(hh)}时 ${p(mm)}分` : `${p(hh)}:${p(mm)}:${p(s % 60)}`;
+}
+
+// ① 30日走势悬停显数值(2026-10-21 用户要求):单位口径与磁贴一致
+function gkRaw(nm, c) {
+  if (nm === 'BTC') return '$' + fmtPrice(c);
+  if (nm === '10Y美债') return c.toFixed(2) + '%';
+  const us = nm === '黄金' || nm === '原油'; // 上证/纳指是指数点位无 $
+  return (us ? '$' : '') + c.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+// fx = 图表横轴位置(viewBox 0..100)。各线根数不同(Binance/新浪35根、macro约30交易日),
+// 每线各取自己最近点、日期如实可差一两天
+function gkTipRows(GK, fx) {
+  if (!GK || !GK.length) return null;
+  const f = Math.max(0, Math.min(100, fx));
+  return GK.map(o => {
+    const i = Math.round(f / 100 * (o.s.length - 1));
+    return { nm: o.nm, col: o.col, t: String(o.s[i].t).slice(5), raw: gkRaw(o.nm, o.s[i].c), v: o.v[i].toFixed(1) };
+  });
 }
 
 // 元/美元 → 大字价格:BTC 用千分位整,BTC以下两位
@@ -280,8 +302,17 @@ function buildSignals(o) {
   return out.slice(0, 5);
 }
 
+// 板块回放时间注(抄 stock.js,2026-10-20 东财 502 调查后):>10min 的回放数据如实标采集时刻,宁缺勿假
+function asOfNote(ts, pre) {
+  if (!ts || Date.now() - ts <= 600e3) return '';
+  const d = new Date(ts);
+  const P = n => String(n).padStart(2, '0');
+  return `<span style="color:#d29a3a;font-size:11px;margin-right:6px">${pre || '东财限流中 ·'} 板块截至 ${P(d.getMonth() + 1)}-${P(d.getDate())} ${P(d.getHours())}:${P(d.getMinutes())} 回放</span>`;
+}
+
 // ---------- 浏览器渲染 ----------
 if (typeof window !== 'undefined') {
+  let GK = null; // ① 30日走势六线数据(renderGlobal 每次渲染重写,gkHover 读它出悬停数值)
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const $ = id => document.getElementById(id);
   function fmtIdxPx(x) { // 指数大数字:2 位小数(≥1000 也要保留小数)
@@ -356,7 +387,7 @@ if (typeof window !== 'undefined') {
       if (!s || s.length < 2) return null;
       const v = s.map(d => d.c / s[0].c * 100);
       v.forEach(x => { if (x < lo) lo = x; if (x > hi) hi = x; });
-      return { nm, col, v, chg };
+      return { nm, col, v, chg, s };
     });
     if (!Number.isFinite(lo)) { lo = 97; hi = 103; }
     if (hi - lo < 2) { const c = (hi + lo) / 2; lo = c - 1; hi = c + 1; } // 全平线也要有呼吸空间
@@ -367,7 +398,10 @@ if (typeof window !== 'undefined') {
         // 2026-09-20 用户要求:鼠标悬停识别是哪条线 → 透明宽描边 .hit 当热区,<title> 原生提示 + CSS 高亮本线/压暗其余
         const tip = `${o.nm} · 近30日 ${o.chg == null ? '—' : o.nm === '10Y美债' ? (o.chg > 0 ? '+' : '') + o.chg + 'bp' : sp(o.chg) + o.chg.toFixed(1) + '%'}`;
         return `<g class="lg"><title>${esc(tip)}</title><polyline class="hit" points="${pts}" vector-effect="non-scaling-stroke"/><polyline class="ln" points="${pts}" stroke="${o.col}" vector-effect="non-scaling-stroke"/></g>`;
-      }).join('');
+      }).join('') +
+      // 悬停参考竖线(pointermove 挪它;画最后 = 盖在线上层,默认藏)
+      `<line class="gg" x1="50" y1="0" x2="50" y2="40" opacity="0" vector-effect="non-scaling-stroke"/>`;
+    GK = norm.filter(Boolean); // 悬停数值浮层取数用(gkHover 监听只绑一次,读这份引用)
     $('gk-legend').innerHTML = CH.map(([nm, col, , chg]) => {
       const txt = chg == null ? '—' : nm === '10Y美债' ? (chg > 0 ? '+' : '') + chg + 'bp' : sp(chg) + chg.toFixed(1) + '%';
       return `<span><i style="background:${col}"></i>${nm}<b>${txt}</b></span>`;
@@ -398,7 +432,7 @@ if (typeof window !== 'undefined') {
     html += `<div class="kvs">${kv}</div>`;
     html += `<div><span class="lbl">热门板块(当日涨幅榜)</span><div class="chips">` +
       (P && P.boards && P.boards.length
-        ? P.boards.slice(0, 4).map(r0 => { const c = pN(r0.pct); return `<span class="chip"><span class="nm">${esc(r0.name)}</span><span class="v ${c == null ? 'dim' : c >= 0 ? 'rna' : 'gna'}">${c == null ? '—' : sp(c) + c.toFixed(1) + '%'}</span></span>`; }).join('')
+        ? asOfNote(P.boardsT) + P.boards.slice(0, 4).map(r0 => { const c = pN(r0.pct); return `<span class="chip"><span class="nm">${esc(r0.name)}</span><span class="v ${c == null ? 'dim' : c >= 0 ? 'rna' : 'gna'}">${c == null ? '—' : sp(c) + c.toFixed(1) + '%'}</span></span>`; }).join('')
         : '<span class="chip"><span class="nm dim">板块数据待取(东财限流自愈)</span></span>') + `</div></div>`;
     $('ash-box').innerHTML = html;
   }
@@ -555,40 +589,50 @@ if (typeof window !== 'undefined') {
       ${s.val ? `<div class="val ${s.vcls || ''}">${esc(s.val)}</div>` : ''}</div>`).join('');
   }
 
+  // 板块级共用解析(2026-10-18 用户要求板块刷新):最新原始数据 + 派生上下文提到窗口作用域,整页渲染与板块刷新走同一套(勿双实现)
+  let D = {}, OV = {}, QMAP = {}, M = {}, P = {}; // D=A股行情原始 data,OV=币圈概览,M=宏观,P=二传补丁(成交额较昨/热门板块,东财时通时断异步补)
+  function readMkt(jm) {
+    D = (jm && jm.data) || {}; QMAP = {};
+    ((D.qt && D.qt.ok && D.qt.data) || []).forEach(r => { if (r && r.ok) QMAP[r.code] = r; });
+    ((D.hk && D.hk.ok && D.hk.data) || []).forEach(r => { if (r && r.ok) QMAP[r.code] = r; }); // 港股指数并入 A股面板次级带
+    return D;
+  }
+  function readOv(jc) { OV = (jc && jc.data) || {}; D.crypto = OV; return OV; } // D.crypto 挂回:motionPass 读 d.crypto 算温度环(沿用旧字段)
+  function mktTempNow() {
+    const sh = QMAP['sh000001'];
+    const br = (D.breadth && D.breadth.ok && D.breadth.data) || null;
+    return aTemp(sh ? sh.chgPct : null,
+      (br && pN(br.ratio)) != null ? pN(br.ratio) : null,
+      D.limit && D.limit.ok && D.limit.data ? D.limit.data.zt : null,
+      D.limit && D.limit.ok && D.limit.data ? D.limit.data.dt : null);
+  }
+  function paintGlobal() { renderGlobal(OV, M, QMAP['sh000001'], (D.shK && D.shK.ok && D.shK.data) || null); } // 上证磁贴/走势线(换掉原 ETH)
+  function paintSignals(temp) {
+    const spot = OV.spot && OV.spot.binance, okx = OV.spot && OV.spot.okx, dom = OV.dom;
+    renderSignals(buildSignals({ qmap: QMAP, temp, limit: D.limit, breadth: D.breadth, ov: OV, moversTop: movers(spot, okx, dom) }));
+  }
+
   function loadAndRender() {
     const get = u => fetch(u).then(r => r.json()).catch(() => null);
     // #who 登录态由公共 nav.js 渲染,这里只拉行情
     Promise.all([
       get('/api/stock/market'), get('/api/stock/opportunity'), get('/api/crypto/overview'), get('/api/macro'), get('/api/events'),
     ]).then(([jm, jo, jc, jmr, jev]) => {
-      const d = (jm && jm.data) || {};
-      d.crypto = (jc && jc.data) || {};
-      const m = (jmr && jmr.data) || {};
-      const qmap = {}; const qs = (d.qt && d.qt.ok && d.qt.data) || [];
-      qs.forEach(r => { if (r && r.ok) qmap[r.code] = r; });
-      ((d.hk && d.hk.ok && d.hk.data) || []).forEach(r => { if (r && r.ok) qmap[r.code] = r; }); // 港股指数并入 A股面板次级带
-      const sh = qmap['sh000001'];
-      const br = (d.breadth && d.breadth.ok && d.breadth.data) || null;
-      const temp = aTemp(sh ? sh.chgPct : null,
-        (br && pN(br.ratio)) != null ? pN(br.ratio) : null,
-        d.limit && d.limit.ok && d.limit.data ? d.limit.data.zt : null,
-        d.limit && d.limit.ok && d.limit.data ? d.limit.data.dt : null);
-      const ov = d.crypto;
-      renderGlobal(ov, m, sh, (d.shK && d.shK.ok && d.shK.data) || null); // 上证磁贴/走势线(换掉原 ETH)
-      const P = {}; // 二传补丁:两市成交额「较昨日」/ 热门板块(东财时通时断,主渲染完成后异步补,勿并进主链)
-      const renderAshP = () => renderAsh(d, qmap, P);
-      renderAshP();
-      renderCry(ov);
+      readMkt(jm); readOv(jc); M = (jmr && jmr.data) || {}; P = {};
+      const temp = mktTempNow();
+      paintGlobal();
+      renderAsh(D, QMAP, P); // 板块② A股
+      renderCry(OV);
       renderEvents(jev && jev.data);
-      const spot = ov.spot && ov.spot.binance, okx = ov.spot && ov.spot.okx, dom = ov.dom;
-      renderSignals(buildSignals({ qmap, temp, limit: d.limit, breadth: d.breadth, ov, moversTop: movers(spot, okx, dom) }));
+      paintSignals(temp);
       renderOppA(jo);
-      renderOppC(ov);
-      d.__temp = temp ? temp.score : null;
-      try { motionPass(d, m); } catch (e) { /* 动效异常永不拖累数据渲染 */ }
+      renderOppC(OV);
+      D.__temp = temp ? temp.score : null;
+      try { motionPass(D, M); } catch (e) { /* 动效异常永不拖累数据渲染 */ }
+      const renderAshP = () => renderAsh(D, QMAP, P);
       get('/api/stock/moneyflow').then(j => { const a = j && j.data && j.data.em && j.data.em.ok ? j.data.em.data.amt : null; if (a) { P.amt = a; renderAshP(); } });
-      get('/api/stock/boards').then(j => { const rows = j && j.data && j.data.em && j.data.em.ok ? j.data.em.data : null; if (rows && rows.length) { P.boards = rows; renderAshP(); } });
-      const asOf = qs.map(r => r.time).find(t => t);
+      get('/api/stock/boards').then(j => { const rows = j && j.data && j.data.em && j.data.em.ok ? j.data.em.data : null; if (rows && rows.length) { P.boards = rows; P.boardsT = (j.data && j.data.asOf) || 0; renderAshP(); } });
+      const asOf = Object.values(QMAP).map(r => r.time).find(t => t);
       $('status').textContent = `免费源 · A股缓存60s / 币圈30s / 宏观15min / 事件1h · 行情时间 ${fmtQuoteTime(asOf) || '—'} · 刷新于 ${new Date().toLocaleTimeString('zh-CN')} · 绿涨红跌`;
     }).catch(() => { $('status').textContent = '部分数据源暂不可用,点击页内刷新可重试'; });
     $('footnote').textContent = '口径说明:首页只消费各雷达页同一批免费接口。「市场温度」「恐慌贪婪」与「今日信号/机会评分」均为启发式读数,不含基本面与逐笔数据,非投资建议;进入 A股/币圈 雷达可见完整分项与数据边界。板块①八项行情:BTC=币安现货 24h;上证指数=腾讯行情/新浪日K(与板块②同源,A股时段口径);纳指/标普500=新浪美股指数(.NDX/.INX)、黄金/原油=新浪期货(XAU/CL)、10Y=美国财政部官方日线、美元指数/VIX=雅虎指数日线(均为最近已发布交易日,24h涨跌=末两个交易日环比);30日走势归一「30日前=100」仅供横向比较,BTC 日线取币安 vision、上证取新浪日K。板块②:A股指数行情=腾讯 qt(恒指/恒生科技为腾讯恒生系列,港股时段更新),上证走势=新浪日K;成交额「较昨日」与热门板块来自东财,限流冷却时稍后二传补齐(属自愈非 bug)。BTC.D=CMC 全球指标(24h 变化为百分点差,标 pt);CMC100 取 CoinMarketCap 官方免key指数端点、CD20 为 CoinDesk 20(CNBC 行情,雅虎 ^CDI20 兜底),两者是指数点位、非币种报价。事件雷达:源为 ForexFactory 当周公开 feed + 本地台账逐周攒(冷启动只显本周属预期),标题机翻,「影响资产/本周风险」为关键词启发式,均为娱乐参考、不构成任何操作依据。';
@@ -598,6 +642,21 @@ if (typeof window !== 'undefined') {
   // SWR(nav.js v2):后台重取成功 → apifresh → 自动重渲替换;手动刷新置 __apibust 无视本地缓存直连
   document.getElementById('refresh') && (document.getElementById('refresh').onclick = () => { window.__apibust = Date.now(); loadAndRender(); });
   window.addEventListener('apifresh', loadAndRender);
+
+  // 板块级刷新(2026-10-18 用户要求):nav.js 依此表在板块右上角挂 ⟳,只重取本板块用到的源、只重渲本板块(罩层也只罩本板块)
+  window.panelRef = {
+    'p-global': async () => { // 板块① 全球市场·宏观(今日信号同在本板块,一并重渲;温度环等动效只在整页渲染时走)
+      const [jm, jc, jmr] = await Promise.all([panelFetch('/api/stock/market'), panelFetch('/api/crypto/overview'), panelFetch('/api/macro')]);
+      readMkt(jm); readOv(jc); M = (jmr && jmr.data) || {};
+      const temp = mktTempNow(); D.__temp = temp ? temp.score : null;
+      paintGlobal(); paintSignals(temp);
+    },
+    'p-ash': async () => { readMkt(await panelFetch('/api/stock/market')); renderAsh(D, QMAP, P); }, // 二传补丁值 P 沿用,不再重拉
+    'p-cry': async () => { renderCry(readOv(await panelFetch('/api/crypto/overview'))); },
+    'p-oppA': async () => { renderOppA(await panelFetch('/api/stock/opportunity')); },
+    'p-oppC': async () => { renderOppC(readOv(await panelFetch('/api/crypto/overview'))); },
+    'p-events': async () => { renderEvents((await panelFetch('/api/events') || {}).data); },
+  };
 
   // ===== THRR Motion System:渲染完成后唯一接触点(motionPass),异常由调用方吞掉不影响数据渲染 =====
   const LAST = {}; // key=「行名|节点class」→ 上次文本;diff 才动(90%静止)
@@ -692,6 +751,36 @@ if (typeof window !== 'undefined') {
     }
   }
 
+  // ⑨ 30日走势悬停显数值(2026-10-21 用户要求「不够明确,需要鼠标停留显示具体数值」):
+  // pointermove → 每线各取最近点,浮层列「日期 · 真实值 · 归一指数」,图内参考竖线同指。
+  // 监听不吃事件,CSS 认线高亮与原 .hit 的 30日 title 均保留;浮层立即出,比原生提示快
+  (function gkHover() {
+    const gsvg = $('gk-chart'), tip = $('gk-tip');
+    const host = gsvg && gsvg.closest('.gright');
+    if (!gsvg || !tip || !host) return;
+    const hide = () => {
+      tip.hidden = true;
+      const gg = gsvg.querySelector('.gg');
+      if (gg) gg.setAttribute('opacity', '0');
+    };
+    gsvg.addEventListener('pointermove', e => {
+      const r = gsvg.getBoundingClientRect();
+      if (!r.width) return;
+      const fx = (e.clientX - r.left) / r.width * 100;
+      const rows = gkTipRows(GK, fx);
+      if (!rows) return;
+      const gg = gsvg.querySelector('.gg');
+      if (gg) { gg.setAttribute('x1', fx.toFixed(1)); gg.setAttribute('x2', fx.toFixed(1)); gg.setAttribute('opacity', '.7'); }
+      tip.innerHTML = rows.map(o => `<div class="r"><i style="background:${o.col}"></i>${esc(o.nm)}<em>${esc(o.t)}</em><b>${esc(o.raw)}</b><s>idx ${o.v}</s></div>`).join('');
+      tip.hidden = false;
+      const q = host.getBoundingClientRect();
+      let x = e.clientX - q.left + 14;
+      if (x + tip.offsetWidth > q.width - 4) x = e.clientX - q.left - tip.offsetWidth - 14; // 右放不下翻左
+      tip.style.left = Math.max(4, x) + 'px';
+    }, { passive: true });
+    gsvg.addEventListener('pointerleave', hide);
+  })();
+
   // 今日财运:点顶栏按钮弹层 → GET /api/fortune(后端随机 50~100)→ 环形灌分 + 档位文案(娱乐)
   (function fortuneWidget() {
     const btn = $('fortune-btn'), mask = $('fort');
@@ -741,6 +830,16 @@ function selftest() {
   A(turnoverTxt(88852161, 103665671) === '1.93万亿', '两市成交额万亿');
   A(turnoverTxt(null, 1) === '—', '缺一市场 → —');
   A(fmtPrice(63452.3) === '63,452' && fmtPrice(143.45) === '143.45' && fmtPrice(0.01234) === '0.0123', '大字价格');
+  A(gkRaw('BTC', 63452.3) === '$63,452' && gkRaw('黄金', 4123.4) === '$4,123.40' && gkRaw('10Y美债', 4.2) === '4.20%' && gkRaw('上证', 3892) === '3,892.00', '悬停数值单位');
+  const GKT = [
+    { nm: 'BTC', col: '#f7931a', s: [{ t: '2026-10-01', c: 60000 }, { t: '2026-10-15', c: 65200 }], v: [100, 108.67] },
+    { nm: '10Y美债', col: '#ff7d94', s: [{ t: '2026-10-01', c: 4.0 }, { t: '2026-10-02', c: 4.1 }, { t: '2026-10-03', c: 4.16 }, { t: '2026-10-15', c: 4.2 }], v: [100, 102.5, 104, 105] },
+  ];
+  const gt = gkTipRows(GKT, 100);
+  A(gt[0].t === '10-15' && gt[0].raw === '$65,200' && gt[0].v === '108.7', '悬停取末点');
+  A(gkTipRows(GKT, 50)[1].t === '10-03', '各线各取自己最近点(长度不等)');
+  A(gkTipRows(GKT, -30)[0].v === '100.0' && gkTipRows(GKT, 400)[1].t === '10-15', 'fx 越界夹紧');
+  A(gkTipRows(null, 50) === null && gkTipRows([], 50) === null, '无线数据不显');
   const pulse = pulseTone(aTemp(1, 0.6, 40, 5), 66, 1.5);
   A(pulse.dot === '🟢' && pulse.txt === '市场风险偏好回升', '双强 → 回升');
   A(pulseTone(aTemp(-2, 0.3, 2, 60), 22, -3).dot === '🔴', '双冷 → 收缩');
@@ -806,6 +905,7 @@ function selftest() {
   A(Math.abs(mktTemp(0, -4, 0).score) <= 1, '全冷 ≈0');
   A(volClass([4, -3.5, 2]) === 'vol-h' && volClass([1.5, 1]) === 'vol-m' && volClass([0.3, 0.5]) === '' && volClass([]) === '', '波动三档');
   A(volClass([null, undefined, 2]) === 'vol-m', 'volClass 忽略空值');
+  A(asOfNote(0) === '' && asOfNote(Date.now() - 30e3) === '' && /东财限流中 ·.*回放/.test(asOfNote(Date.now() - 3600e3)), '板块回放注:新鲜不标/旧数据标时刻');
   console.log('hub.js selftest OK');
 }
 if (typeof require !== 'undefined' && require.main === module) selftest();

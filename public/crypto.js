@@ -1,4 +1,4 @@
-/* 币圈板块前端:五币现货/市值、BTC·ETH ETF 资金流、四大所活动(每所 ≤3)、全中文。
+/* 币圈板块前端:现货列表(BTC/ETH/SOL/BNB/OKB/BGB/DOGE)与市值结构、BTC·ETH ETF 资金流、四大所活动(每所 ≤3)、全中文。
    纯函数可自检:node public/crypto.js */
 
 // alternative.me 档位:0-24 极度恐惧 / 25-49 恐惧 / 50-74 贪婪 / 75-100 极度贪婪
@@ -191,42 +191,48 @@ if (typeof window !== 'undefined') {
   let oiCoin = 'BTC';
   let oiRange = '7d'; // OI 图区间:1d/7d/30d
 
-  async function loadAndRender() {
-    const st = document.getElementById('status');
-    const [ov, an, et, nw, ch, bk] = await Promise.all([
-      fetch('/api/crypto/overview').then(r => r.json()).catch(() => null),
-      fetch('/api/crypto/announcements').then(r => r.json()).catch(() => null),
-      fetch('/api/crypto/etf').then(r => r.json()).catch(() => null),
-      fetch('/api/crypto/news').then(r => r.json()).catch(() => null),
-      fetch('/api/crypto/chain').then(r => r.json()).catch(() => null),
-      fetch('/api/crypto/book').then(r => r.json()).catch(() => null),
-    ]);
-    const d = (ov && ov.data) || {};
-    let spotRows = []; // 六币现货行,供下方宏观/风险板块复用(需提到 if 之外的作用域)
+  // 板块级共享状态与 paint 拆分(2026-10-18 用户要求板块刷新):整页渲染与板块刷新共用同一套解析/绘制函数(勿双实现)
+  let OVD = {}, END = {}, NWD = {}, EFD = null, CHD = null, BKD = null; // 六端点最近一次原始 data(缺=null/{}),板块刷新逐格替换
+  let SPOTROWS = [], G = null; // 现货行(BTC…DOGE 七币,CP 2026-10-08 用户要求去掉)/全市场市值,供宏观清单与风险监控复用
 
-    // —— 市场概览:六币现货 + 全市场小结 + 市值结构 ——
-    if (d.spot) {
-      const binance = d.spot.binance, okx = d.spot.okx;
-      spotRows = (binance && binance.ok ? binance.data : []).concat(okx && okx.ok ? okx.data : []);
-      // 币安/欧易都没有现货的币(如 BGB,仅 Bitget 本所交易)用 dom 里 CoinGecko markets 同一次调用带回的价补行,不新增上游
-      for (const x of ((d.dom && d.dom.ok && d.dom.data) || []))
-        if (x.price != null && !spotRows.some(s => s.sym === x.sym))
-          spotRows.push({ sym: x.sym, price: x.price, chgPct: x.chgPct, high: x.high, low: x.low, quoteVol: x.quoteVol, cg: true });
-      document.getElementById('src-market').innerHTML = srcBadges({
-        '币安现货': binance, 'OKX/OKB': okx,
-        ...(spotRows.some(s => s.cg) ? { 'CoinGecko直采(BGB)': { ok: true } } : {}),
-        'CoinGecko市值': d.global, 'CoinGecko占比': d.dom,
-      });
-      // 7d/30d涨幅与市值:CoinGecko markets 一次带回(dom: [{sym,cap,rank,chgPct,chg7,chg30}]),按币种查表
-      const domMap = Object.fromEntries(((d.dom && d.dom.ok && d.dom.data) || []).map(x => [x.sym, x]));
-      const chgCell = v => { const c = p2(v); return `<td class="${c == null ? '' : (c >= 0 ? 'pos' : 'neg')}">${c == null ? '—' : (c > 0 ? '+' : '') + c.toFixed(2) + '%'}</td>`; };
-      document.getElementById('spot').innerHTML = spotRows.length
-        ? `<table><thead><tr><th>币种</th><th>最新价</th><th>24h涨跌</th><th title="OKX 日K口径:今日 0 点(北京)开盘价至当下的涨跌幅,与 OKX App「日涨幅」同源;「24h涨跌」是滚动24小时,两列口径不同">日涨幅</th><th>7d涨跌</th><th>30d涨跌</th><th>90d涨跌</th><th>1y涨跌</th><th>市值</th><th>24h最高</th><th>24h最低</th><th>24h成交额</th></tr></thead><tbody>${
-            spotRows.map(r => { const dm = domMap[r.sym] || {}; return `<tr><td class="nm">${r.sym}</td><td>${f2(r.price)}</td>${chgCell(r.chgPct)}${chgCell(r.dayPct)}${chgCell(dm.chg7)}${chgCell(dm.chg30)}${chgCell(dm.chg90)}${chgCell(dm.chg1y)}<td>${fmtUsdShort(dm.cap)}</td><td>${f2(r.high)}</td><td>${f2(r.low)}</td><td>${fmtUsdShort(r.quoteVol)}</td></tr>`; }).join('')
-          }</tbody></table>`
-        : '<div style="padding:18px;color:var(--down);font-size:13px">✗ 现货行情不可用</div>';
-    }
-    const g = d.global && d.global.ok ? d.global.data : null;
+  // —— 市场概览:现货列表 + 来源徽标(全市场小结见 paintGsum)——
+  function paintSpot() {
+    const d = OVD;
+    if (!d.spot) return;
+    const binance = d.spot.binance, okx = d.spot.okx;
+    SPOTROWS = (binance && binance.ok ? binance.data : []).concat(okx && okx.ok ? okx.data : []);
+    // 币安/欧易都没有现货的币(如 BGB,仅 Bitget 本所交易)用 dom 里 CoinGecko markets 同一次调用带回的价补行,不新增上游
+    for (const x of ((d.dom && d.dom.ok && d.dom.data) || []))
+      if (x.price != null && !SPOTROWS.some(s => s.sym === x.sym))
+        SPOTROWS.push({ sym: x.sym, price: x.price, chgPct: x.chgPct, high: x.high, low: x.low, quoteVol: x.quoteVol, cg: true });
+    // 2026-10-08 用户要求:DOGE 在现货列表里排最后
+    const di = SPOTROWS.findIndex(s => s.sym === 'DOGE');
+    if (di >= 0) SPOTROWS.push(SPOTROWS.splice(di, 1)[0]);
+    document.getElementById('src-market').innerHTML = srcBadges({
+      '币安现货': binance, 'OKX/OKB': okx,
+      ...(SPOTROWS.some(s => s.cg) ? { 'CoinGecko直采(BGB)': { ok: true } } : {}),
+      // 备源徽标如实改名(2026-10-20 CG 429 备源链):global.src==='cmc' / dom 行 src==='exch'
+      ...(d.global && d.global.ok && d.global.data && d.global.data.src === 'cmc' ? { '总市值(CMC备源)': d.global } : { 'CoinGecko市值': d.global }),
+      ...(d.dom && d.dom.ok && d.dom.data && d.dom.data[0] && d.dom.data[0].src === 'exch' ? { '区间涨跌(交易所备源)': d.dom } : { 'CoinGecko占比': d.dom }),
+    });
+    // 7d/30d涨幅与市值:CoinGecko markets 一次带回(dom: [{sym,cap,rank,chgPct,chg7,chg30}]),按币种查表
+    // spotExt = 列表多出的 DOGE 同形补丁(2026-09-23 用户要求;CP 同日曾加、2026-10-08 去掉),不进市值结构饼图
+    const domMap = Object.fromEntries(
+      [
+        ...((d.dom && d.dom.ok && d.dom.data) || []),
+        ...((d.spotExt && d.spotExt.ok && d.spotExt.data) || []),
+      ].map(x => [x.sym, x])
+    );
+    const chgCell = v => { const c = p2(v); return `<td class="${c == null ? '' : (c >= 0 ? 'pos' : 'neg')}">${c == null ? '—' : (c > 0 ? '+' : '') + c.toFixed(2) + '%'}</td>`; };
+    document.getElementById('spot').innerHTML = SPOTROWS.length
+      ? `<table><thead><tr><th>币种</th><th>最新价</th><th>24h涨跌</th><th title="OKX 日K口径:今日 0 点(北京)开盘价至当下的涨跌幅,与 OKX App「日涨幅」同源;「24h涨跌」是滚动24小时,两列口径不同">日涨幅</th><th>7d涨跌</th><th>30d涨跌</th><th>90d涨跌</th><th>1y涨跌</th><th>市值</th><th>24h最高</th><th>24h最低</th><th>24h成交额</th></tr></thead><tbody>${
+          SPOTROWS.map(r => { const dm = domMap[r.sym] || {}; return `<tr><td class="nm">${r.sym}</td><td>${f2(r.price)}</td>${chgCell(r.chgPct)}${chgCell(r.dayPct)}${chgCell(dm.chg7)}${chgCell(dm.chg30)}${chgCell(dm.chg90)}${chgCell(dm.chg1y)}<td>${fmtUsdShort(dm.cap)}</td><td>${f2(r.high)}</td><td>${f2(r.low)}</td><td>${fmtUsdShort(r.quoteVol)}</td></tr>`; }).join('')
+        }</tbody></table>`
+      : '<div style="padding:18px;color:var(--down);font-size:13px">✗ 现货行情不可用</div>';
+  }
+  // 全市场小结四格(注:G 由调用方先算好)
+  function paintGsum() {
+    const g = G;
     const mc = g ? p2(g.mcapChgPct) : null;
     document.getElementById('gsum').innerHTML = g
       ? `<div class="g"><div class="gk">全市场总市值</div><div class="gv">${fmtUsdShort(g.totalUsd)}</div></div>
@@ -234,17 +240,18 @@ if (typeof window !== 'undefined') {
          <div class="g"><div class="gk">BTC 占比</div><div class="gv">${g.btcPct != null && Number.isFinite(+g.btcPct) ? Number(g.btcPct).toFixed(1) + '%' : '—'}</div></div>
          <div class="g"><div class="gk">ETH 占比</div><div class="gv">${g.ethPct != null && Number.isFinite(+g.ethPct) ? Number(g.ethPct).toFixed(1) + '%' : '—'}</div></div>`
       : '<div class="gk" style="padding:14px 18px">全市场数据不可用</div>';
-    // —— 市值结构:饼图(五币 + 其他;占比=市值/全市场)——(g 可能为空,函数内兜底)
-    renderMcap((d.dom && d.dom.ok && d.dom.data) || [], g);
+  }
+  // —— 市值结构:饼图(五币 + 其他;占比=市值/全市场)——(G 可能为空,函数内兜底)
+  function paintMcap() {
+    renderMcap((OVD.dom && OVD.dom.ok && OVD.dom.data) || [], G);
+  }
+  // —— 相关新闻(标题已译简体)—— / 恐慌贪婪近30天折线 ——
+  function paintNews() { renderNews(NWD.news); }
+  function paintFng() { renderFng(OVD.fng); }
 
-    // —— 相关新闻(标题已译简体)——(行数据 rows/g 后续宏观清单复用)
-    renderNews(((nw && nw.data) || {}).news);
-
-    // —— 恐慌贪婪:近30天折线 ——
-    renderFng(d.fng);
-
-    // —— ETF 资金流 ——
-    const ef = et && et.data;
+  // —— ETF 资金流 ——
+  function paintEtf() {
+    const ef = EFD;
     document.getElementById('src-etf').innerHTML = srcBadges(
       ef ? { 'Farside 全历史回填': { ok: true }, '延后1日': { ok: true } } : { 'ETF 资金流': { ok: false, error: '接口不可达' } }
     );
@@ -263,35 +270,54 @@ if (typeof window !== 'undefined') {
     } else {
       document.getElementById('etf-note').textContent = '';
     }
-
-    // —— 宏观驱动清单(复用本页已取数据)+ 链上数据 ——
-    renderMacro(spotRows, g, d.fng, ef);
-    renderChain((ch && ch.data) || null);
-    renderBook((bk && bk.data) || null);
-
-    // —— 活动 / 机会(四列 · 每源 ≤3)——
-    const ad = (an && an.data) || {};
+  }
+  // —— 宏观驱动清单(复用本页已取数据)/链上/挂单 ——
+  function paintMacro() { renderMacro(SPOTROWS, G, OVD.fng, EFD); }
+  function paintChain() { renderChain(CHD); }
+  function paintBook() { renderBook(BKD); }
+  // —— 活动 / 机会(四列 · 每源 ≤3)——
+  function paintAnn() {
+    const ad = END;
     document.getElementById('src-ann').innerHTML = srcBadges({ '币安': ad.binance, '欧易': ad.okx, 'Bybit': ad.bybit, 'Bitget': ad.bitget });
     const col = (title, r) => `<div class="col"><h3>${title}</h3>${
       r && r.ok && r.data.length
         ? '<ul>' + r.data.slice(0, 3).map(a => `<li>${annHi(a.title) ? '<span class="hot">机会</span>' : ''}${a.url ? `<a href="${esc(a.url)}" target="_blank" rel="noopener">${esc(a.title)}</a>` : esc(a.title)}<span class="t">${shortT(a.time)}</span></li>`).join('') + '</ul>'
         : '<div class="e">✗ ' + esc((r && r.error) || '无数据') + '</div>'}</div>`;
     document.getElementById('ann').innerHTML = col('币安', ad.binance) + col('欧易', ad.okx) + col('Bybit', ad.bybit) + col('Bitget', ad.bitget);
+  }
+  // —— 风险监控:费率/波幅/情绪/拥堵,费率用当前资金费率图所在币种 ——
+  function paintRisk() {
+    const fngSorted = ((OVD.fng && OVD.fng.ok && OVD.fng.data) || []).slice().sort((a, b) => +a.ts - +b.ts);
+    renderRisk(riskAssess({
+      rates: fundNow,
+      spot: SPOTROWS,
+      fng: fngSorted.length ? +fngSorted[fngSorted.length - 1].value : null,
+      mem: CHD && CHD.mempool && CHD.mempool.ok ? CHD.mempool.data : null,
+    }));
+  }
 
+  async function loadAndRender() {
+    const st = document.getElementById('status');
+    const [ov, an, et, nw, ch, bk] = await Promise.all([
+      fetch('/api/crypto/overview').then(r => r.json()).catch(() => null),
+      fetch('/api/crypto/announcements').then(r => r.json()).catch(() => null),
+      fetch('/api/crypto/etf').then(r => r.json()).catch(() => null),
+      fetch('/api/crypto/news').then(r => r.json()).catch(() => null),
+      fetch('/api/crypto/chain').then(r => r.json()).catch(() => null),
+      fetch('/api/crypto/book').then(r => r.json()).catch(() => null),
+    ]);
+    OVD = (ov && ov.data) || {}; END = (an && an.data) || {}; NWD = (nw && nw.data) || {};
+    EFD = et && et.data; CHD = (ch && ch.data) || null; BKD = (bk && bk.data) || null;
+    // —— 市场概览:现货列表 + 全市场小结 + 市值结构 ——(宏观清单/风险监控复用缓存解析)
+    paintSpot();
+    G = OVD.global && OVD.global.ok ? OVD.global.data : null;
+    paintGsum(); paintMcap(); paintNews(); paintFng(); paintEtf(); paintMacro(); paintChain(); paintBook(); paintAnn();
     // —— 永续资金费率走势(币安/欧易/Bitget/Bybit 每所一线,币种可切换)——
     await loadFunding();
     // —— 未平仓合约 OI 走势(币安/欧易/Bybit + 合计)——
     await loadOi();
-
-    // —— 风险监控:费率/波幅/情绪/拥堵,费率用当前资金费率图所在币种 ——
-    const chd = (ch && ch.data) || null;
-    const fngSorted = ((d.fng && d.fng.ok && d.fng.data) || []).slice().sort((a, b) => +a.ts - +b.ts);
-    renderRisk(riskAssess({
-      rates: fundNow,
-      spot: spotRows,
-      fng: fngSorted.length ? +fngSorted[fngSorted.length - 1].value : null,
-      mem: chd && chd.mempool && chd.mempool.ok ? chd.mempool.data : null,
-    }));
+    // —— 风险监控 ——
+    paintRisk();
 
     st.textContent = `公开接口 · 服务端 30s 缓存 · 页面时间 ${new Date().toLocaleTimeString('zh-CN')}`;
   }
@@ -342,6 +368,8 @@ if (typeof window !== 'undefined') {
     const items = rows
       .filter(c => c.cap != null && Number.isFinite(+c.cap))
       .map(c => ({ sym: c.sym, cap: Number(c.cap), chg: p2(c.chgPct) }));
+    // CG 挂了走交易所备源时 cap 全 null(免费无市值源)——整饼如实收起,现货表涨跌列不受影响(2026-10-20)
+    if (!items.length) { box.innerHTML = '<div class="h">市值结构</div><div style="color:var(--ink-2);font-size:12.5px;padding-bottom:8px">✗ 市值结构仅 CoinGecko 有源(现为交易所备源,涨跌列正常)</div>'; return; }
     const sum = items.reduce((a, x) => a + x.cap, 0);
     const otherCap = total != null ? Math.max(0, total - sum) : null;
     const head = '<div class="h">市值结构(占比=市值/全市场)</div>';
@@ -414,10 +442,12 @@ if (typeof window !== 'undefined') {
   }
 
   // —— 资金费率折线:币安/欧易/Bitget/Bybit 每所一线(8h 结算历史;Bitget 仅当前点)——
-  async function loadFunding() {
+  async function loadFunding(fresh) {
     let s = {};
     try {
-      const r = await fetch(`/api/crypto/funding/history?coin=${encodeURIComponent(fundCoin)}`).then(x => x.json());
+      const u = `/api/crypto/funding/history?coin=${encodeURIComponent(fundCoin)}`;
+      // fresh=板块 ⟳ 直连(nav.panelFetch),不走 SWR 缓存也不触发整页罩
+      const r = fresh ? await panelFetch(u) : await fetch(u).then(x => x.json());
       s = (r && r.data && r.data.series) || {};
     } catch { /* 下面按空处理 */ }
     document.getElementById('src-funding').innerHTML = srcBadges({
@@ -503,10 +533,11 @@ if (typeof window !== 'undefined') {
 
   // —— 未平仓合约 OI 折线:币安/欧易/Bybit 每所一线(USDT 名义额)+ 合计灰虚线 ——
   // OKB 币安无永续(实测 -1121),该线自然缺;BGB 仅 Bitget 本所有交易、Bitget 无免费 OI 历史接口 → 不入本图,pill 不放
-  async function loadOi() {
+  async function loadOi(fresh) {
     let s = {};
     try {
-      const r = await fetch(`/api/crypto/oi/history?coin=${encodeURIComponent(oiCoin)}&r=${oiRange}`).then(x => x.json());
+      const u = `/api/crypto/oi/history?coin=${encodeURIComponent(oiCoin)}&r=${oiRange}`;
+      const r = fresh ? await panelFetch(u) : await fetch(u).then(x => x.json());
       s = (r && r.data && r.data.series) || {};
     } catch { /* 下面按空处理 */ }
     document.getElementById('src-oi').innerHTML = srcBadges({
@@ -572,8 +603,8 @@ if (typeof window !== 'undefined') {
   }
 
   // —— 相关新闻:标题已译简体;snippet 保留原文摘要 ——
-  // 2026-09-20 用户要求按「时间线+重要程度」编排(共用 .tl 样式在 theme.css,抄首页事件雷达):
-  // 最新在前、按日分组挂日期头,节点空心刻度 = cryptoNewsHeat 级别
+  // 2026-10-21 用户要求参考首页「今日信号」的设计、板块可上下滑动(位置在页尾;c-news 10-21 曾上移,10-22 用户要求挪回原位,勿再挪):
+  // 圆点卡列表(.slw/.sln 在 theme.css),级别=cryptoNewsHeat(红大圈/琥珀/灰点),时间进每行 meta、不再按日分组;放 20 条吃滚动。
   function renderNews(r) {
     const src = document.getElementById('src-news');
     const box = document.getElementById('news');
@@ -583,24 +614,11 @@ if (typeof window !== 'undefined') {
       return;
     }
     src.innerHTML = srcBadges({ 'Cointelegraph 资讯': { ok: true }, '标题转简体': { ok: true } });
-    const pad = n => String(n).padStart(2, '0');
-    const dk = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-    const now = new Date(), today = dk(now), yest = dk(new Date(+now - 864e5));
-    const WD = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
-    const rows = r.data.slice().sort((a, b) => (+b.ts || 0) - (+a.ts || 0)).slice(0, 12);
-    let lastDay = '';
-    box.innerHTML = `<div class="tlkey"><span class="k-hi"><i></i>主流币 / 监管 / 安全事件</span><span class="k-mid"><i></i>交易所 / 代币 / 宏观数据</span><span class="k-lo"><i></i>其他</span></div><div class="tl">` + rows.map(it => {
-      const d = it.ts ? dk(new Date(+it.ts)) : '';
-      let hd = '';
-      if (d && d !== lastDay) {
-        lastDay = d;
-        hd = `<div class="tlday"><b>${esc(d.slice(5))}</b><span>${d === today ? ' · 今天' : d === yest ? ' · 昨天' : ''}</span><i>${WD[new Date(d + 'T00:00:00').getDay()]}</i></div>`;
-      }
-      return hd + `<div class="tlr ${cryptoNewsHeat(it.title)}"><span class="tdot"></span><div class="tlb">
-        <a class="tt" href="${esc(it.link)}" target="_blank" rel="noopener">${esc(it.title)}</a>
-        ${it.snippet ? `<div class="ds">${esc(it.snippet)}</div>` : ''}
-        <div class="mt"><span class="hm">${fmtTs(it.ts)}</span></div></div></div>`;
-    }).join('') + '</div>';
+    const rows = r.data.slice().sort((a, b) => (+b.ts || 0) - (+a.ts || 0)).slice(0, 20);
+    box.innerHTML = '<div class="slw">' + rows.map(it => `<div class="sln ${cryptoNewsHeat(it.title)}"><i></i>
+      <a class="tt" href="${esc(it.link)}" target="_blank" rel="noopener">${esc(it.title)}</a>
+      ${it.snippet ? `<div class="ds">${esc(it.snippet)}</div>` : ''}
+      <div class="mt"><span class="hm">${fmtTs(it.ts)}</span></div></div>`).join('') + '</div>';
   }
 
   // —— 宏观驱动清单:全部数字来自本页其余接口(不加新上游),给"为什么涨跌"一个资金面清单 ——
@@ -626,8 +644,8 @@ if (typeof window !== 'undefined') {
     const sorted = (rows || []).filter(r => r.chgPct != null && Number.isFinite(+r.chgPct)).slice().sort((a, b) => b.chgPct - a.chgPct);
     if (sorted.length) {
       const top = sorted[0], bot = sorted[sorted.length - 1];
-      if (top.chgPct > 0.5) c.push(row('领涨主流', `<span style="color:var(--up)">${esc(top.sym)} ${pct(top.chgPct)}</span>`, '今日五币里最强'));
-      if (bot.chgPct < -0.5) c.push(row('领跌主流', `<span style="color:var(--down)">${esc(bot.sym)} ${pct(bot.chgPct)}</span>`, '今日五币里最弱'));
+      if (top.chgPct > 0.5) c.push(row('领涨主流', `<span style="color:var(--up)">${esc(top.sym)} ${pct(top.chgPct)}</span>`, '现货列表里最强'));
+      if (bot.chgPct < -0.5) c.push(row('领跌主流', `<span style="color:var(--down)">${esc(bot.sym)} ${pct(bot.chgPct)}</span>`, '现货列表里最弱'));
     }
     const farr = (fng && fng.ok && fng.data || []).filter(d => d && Number.isFinite(+d.ts) && Number.isFinite(+d.value)).sort((a, b) => +a.ts - +b.ts);
     if (farr.length) {
@@ -714,6 +732,23 @@ if (typeof window !== 'undefined') {
       return `<div class="rk"><span class="tag" style="color:${col};background:${col}22">${tag}</span><div><div class="nm">${it.name}</div><div class="vl" style="color:${it.lvl === 'ok' ? 'var(--ink-2)' : col}">${it.val}</div><div class="ht">${it.hint}</div></div></div>`;
     }).join('');
   }
+
+  // 板块 ⟳(nav.js 自动挂按钮,只罩本板块):各板只重取自己用到的源、只重渲自己。
+  // overview 一个端点喂 5 块(现货/小结/市值/贪婪/宏观/风险),重取后逐块按需重画。
+  async function useOv() { const j = await panelFetch('/api/crypto/overview'); OVD = (j && j.data) || {}; G = OVD.global && OVD.global.ok ? OVD.global.data : null; }
+  window.panelRef = {
+    'c-mkt': async () => { await useOv(); paintSpot(); paintGsum(); paintMacro(); paintRisk(); },
+    'c-mcap': async () => { await useOv(); paintMcap(); },
+    'c-fng': async () => { await useOv(); paintFng(); },
+    'c-funding': async () => { await loadFunding(1); paintRisk(); },
+    'c-oi': () => loadOi(1),
+    'c-book': async () => { const j = await panelFetch('/api/crypto/book'); BKD = (j && j.data) || null; paintBook(); },
+    'c-etf': async () => { const j = await panelFetch('/api/crypto/etf'); EFD = j && j.data; paintEtf(); paintMacro(); },
+    'c-chain': async () => { const j = await panelFetch('/api/crypto/chain'); CHD = (j && j.data) || null; paintChain(); paintRisk(); },
+    'c-risk': async () => { await Promise.all([useOv(), panelFetch('/api/crypto/chain').then(j => { CHD = (j && j.data) || null; })]); paintRisk(); },
+    'c-ann': async () => { const j = await panelFetch('/api/crypto/announcements'); END = (j && j.data) || {}; paintAnn(); },
+    'c-news': async () => { const j = await panelFetch('/api/crypto/news'); NWD = (j && j.data) || {}; paintNews(); },
+  };
 
   // SWR(nav.js v2):后台重取成功 → apifresh → 自动重渲替换;手动刷新置 __apibust 无视本地缓存直连
   document.getElementById('refresh').onclick = () => { window.__apibust = Date.now(); loadAndRender(); };

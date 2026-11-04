@@ -89,3 +89,15 @@ CREATE TABLE IF NOT EXISTS stat_view (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_page_ip` (`page`, `ip`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ===== 2026-09-30 理财/零钱充值字段(充值为正、提取为负;增量=本月−上月−充值) =====
+-- 已由 scripts/add_deposit_cols.js 幂等执行(SHOW COLUMNS 守卫,缺则 ADD、有则 MODIFY 归位);历史旧行留 NULL 当 0,增量口径不变
+-- 列序:每个 deposit 紧跟本项的 *_increase
+ALTER TABLE `money_finance`
+  ADD COLUMN `fund_deposit`  int DEFAULT NULL COMMENT '基金充值(充值为正、提取为负)' AFTER `fund_increase`,
+  ADD COLUMN `bit_deposit`   int DEFAULT NULL COMMENT '币充值(充值为正、提取为负)' AFTER `bit_increase`,
+  ADD COLUMN `stock_deposit` int DEFAULT NULL COMMENT '股票充值(充值为正、提取为负)' AFTER `stock_increase`,
+  ADD COLUMN `zfb_deposit`   int DEFAULT NULL COMMENT '支付宝充值(充值为正、提取为负)' AFTER `zfb_increase`,
+  ADD COLUMN `hk_stock_deposit` int DEFAULT NULL COMMENT '港股充值(充值为正、提取为负)' AFTER `hk_stock_increase`;
+ALTER TABLE `money`
+  ADD COLUMN `periodical_deposit` int DEFAULT NULL COMMENT '零钱充值(充值为正、提取为负)' AFTER `periodical`;

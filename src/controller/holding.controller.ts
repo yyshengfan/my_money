@@ -4,7 +4,7 @@ import { InjectEntityModel } from '@midwayjs/typeorm';
 import { Repository } from 'typeorm';
 import { Holding } from '../entity/entities/Holding';
 import { QtService, quoteCode } from '../service/qt.service';
-import { HoldingService } from '../service/holding.service';
+import { HoldingService, demoQuotes } from '../service/holding.service';
 import { DEMO_STOCKS } from '../service/demo';
 
 @Controller('/api/holding')
@@ -33,18 +33,15 @@ export class HoldingController {
   }
 
   // 逐行 {code,name,market,...行情} 或 {...,error}:行情整体挂时不白屏
+  // 2026-09-22 用户要求:持仓板块不走缓存(qt 传 fresh=true 实时直连);演示账号回写死假数据,零上游
   @Get('/quotes')
-  async quotes(@Query('fresh') fresh?: string) {
-    const rows: Array<{ code: string; name: string; market: string }> = this.isDemo
-      ? DEMO_STOCKS
-      : await this.holdingRepo.find({ order: { id: 'ASC' } });
+  async quotes() {
+    if (this.isDemo) return { success: true, message: 'OK', data: demoQuotes() };
+    const rows: Array<{ code: string; name: string; market: string }> = await this.holdingRepo.find({ order: { id: 'ASC' } });
     let map: Record<string, any> = {};
     let err: string | null = null;
     try {
-      map = await this.qtService.quotes(
-        rows.map(r => quoteCode(r.code, r.market)),
-        fresh === '1' // 页面「刷新」按钮强制跳过 60s 缓存
-      );
+      map = await this.qtService.quotes(rows.map(r => quoteCode(r.code, r.market)), true);
     } catch (e: any) {
       err = String(e?.message || e);
     }
@@ -57,21 +54,21 @@ export class HoldingController {
     return { success: !err, message: err ? `行情源不可用:${err}` : 'OK', data };
   }
 
-  // ③ A股/港股技术面简评(逐只 {tech,rs,verdict} 或 {error},60s 缓存)
+  // ③ A股/港股技术面简评(逐只 {tech,rs,verdict} 或 {error},实时无缓存;演示账号回写死假数据)
   @Get('/analysis')
-  async analysis(@Query('fresh') fresh?: string) {
+  async analysis() {
     try {
-      return { success: true, message: 'OK', data: await this.holdingService.analysis(fresh === '1', this.isDemo) };
+      return { success: true, message: 'OK', data: await this.holdingService.analysis(this.isDemo) };
     } catch (e: any) {
       return { success: false, message: String(e?.message || e), data: [] };
     }
   }
 
-  // ④ 币圈持仓(现货+合约,台账 data/crypto_holdings.json;演示账号用假台账)
+  // ④ 币圈持仓(现货+合约,台账 data/crypto_holdings.json;实时无缓存,演示账号回写死假数据)
   @Get('/crypto')
-  async crypto(@Query('fresh') fresh?: string) {
+  async crypto() {
     try {
-      return { success: true, message: 'OK', data: await this.holdingService.crypto(fresh === '1', this.isDemo) };
+      return { success: true, message: 'OK', data: await this.holdingService.crypto(this.isDemo) };
     } catch (e: any) {
       return { success: false, message: String(e?.message || e), data: null };
     }

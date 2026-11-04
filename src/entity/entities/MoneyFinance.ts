@@ -25,6 +25,14 @@ export class MoneyFinance {
   fundIncrease: number | null;
 
   @Column("int", {
+    name: "fund_deposit",
+    nullable: true,
+    comment: "基金充值(充值为正、提取为负)",
+    default: () => "'0'",
+  })
+  fundDeposit: number | null;
+
+  @Column("int", {
     name: "bit_amount",
     nullable: true,
     comment: "币余",
@@ -39,6 +47,14 @@ export class MoneyFinance {
     default: () => "'0'",
   })
   bitIncrease: number | null;
+
+  @Column("int", {
+    name: "bit_deposit",
+    nullable: true,
+    comment: "币充值(充值为正、提取为负)",
+    default: () => "'0'",
+  })
+  bitDeposit: number | null;
 
   @Column("int", {
     name: "stock_amount",
@@ -57,6 +73,14 @@ export class MoneyFinance {
   stockIncrease: number | null;
 
   @Column("int", {
+    name: "stock_deposit",
+    nullable: true,
+    comment: "股票充值(充值为正、提取为负)",
+    default: () => "'0'",
+  })
+  stockDeposit: number | null;
+
+  @Column("int", {
     name: "hk_stock",
     nullable: true,
     comment: "股余",
@@ -73,6 +97,14 @@ export class MoneyFinance {
   hkStockIncrease: number | null;
 
   @Column("int", {
+    name: "hk_stock_deposit",
+    nullable: true,
+    comment: "港股充值(充值为正、提取为负)",
+    default: () => "'0'",
+  })
+  hkStockDeposit: number | null;
+
+  @Column("int", {
     name: "zfb_amount",
     nullable: true,
     comment: "zfb",
@@ -87,6 +119,14 @@ export class MoneyFinance {
     default: () => "'0'",
   })
   zfbIncrease: number | null;
+
+  @Column("int", {
+    name: "zfb_deposit",
+    nullable: true,
+    comment: "支付宝充值(充值为正、提取为负)",
+    default: () => "'0'",
+  })
+  zfbDeposit: number | null;
 
   @Column("int", {
     name: "sum_increase",

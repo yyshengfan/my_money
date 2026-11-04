@@ -10,7 +10,9 @@ const OF = [
   ['其他', 'outmoneyOther'],
 ];
 const fmt = v => Math.round(v).toLocaleString('zh-CN');
-const outSum = r => OF.reduce((a, [, k]) => a + (r[k] || 0), 0);
+// 用户记账约定「缴纳为负、房租收入为正」→ 支出归一:负数取绝对值,房租正数=收入不计(2026-09-29,与 dashboard 同口径)
+const payAmt = (k, v) => v == null ? 0 : (k === 'outmoneyRent' ? Math.max(0, -v) : Math.abs(v));
+const outSum = r => OF.reduce((a, [, k]) => a + payAmt(k, r[k]), 0);
 const monthRows = (rows, m) => rows.filter(r => r.time.startsWith(m));
 
 // 连续月份轴(首账月 → 末账月),空月也能翻到
@@ -102,7 +104,7 @@ if (typeof window !== 'undefined') {
     document.getElementById('d-out').innerHTML = tipOf(agg.out, pAgg ? pAgg.out : 0, plab, 'neutral');
 
     // 支出构成
-    const vals = OF.map(([, k]) => rs.reduce((a, r) => a + (r[k] || 0), 0));
+    const vals = OF.map(([, k]) => rs.reduce((a, r) => a + payAmt(k, r[k]), 0));
     const maxOf = Math.max(...vals, 1);
     document.getElementById('bars').innerHTML = OF.map(([lab], i) =>
       `<div class="b ${vals[i] ? '' : 'zero'}"><span>${lab}</span><span class="t"><i style="width:${vals[i] / maxOf * 100}%"></i></span><span class="val">${vals[i] ? fmt(vals[i]) : '—'}</span></div>`).join('');
@@ -153,7 +155,9 @@ function selftest() {
     { time: '2026-08-10', inmoney: 200, credit: 40, outmoneyRent: 10, outmoneyMortgage: 0, outmoneySocialSecurity: 0, outmoneyOther: 0, money: 1100 },
     { time: '2026-08-20', inmoney: 50, credit: 0, outmoneyRent: 0, outmoneyMortgage: 0, outmoneySocialSecurity: 0, outmoneyOther: 0, money: 1150 },
   ];
-  console.assert(outSum(rows[0]) === 55, '显性支出=null/缺字段按 0,合计 30+20+5=55');
+  console.assert(outSum(rows[0]) === 55, '显性支出=null/缺字段按 0,合计 30+20+5=55(正数缴纳取绝对值兼容老数据)');
+  console.assert(outSum({ credit: 5000, outmoneyRent: -2000, outmoneyMortgage: 0, outmoneySocialSecurity: -500, outmoneyOther: -300 }) === 7800, '缴纳为负 → 取绝对值(5000+2000+0+500+300)');
+  console.assert(outSum({ outmoneyRent: 1500 }) === 0, '房租正数=租金收入,不计支出');
   const ms = monthAxis(rows);
   console.assert(ms.join(',') === '2026-06,2026-07,2026-08', '连续月轴补上空月');
   const a = monthAgg(monthRows(rows, '2026-08'));

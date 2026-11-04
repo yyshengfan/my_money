@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>资金流水</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
-<link rel="stylesheet" href="theme.css?v=20260921a">
+<link rel="stylesheet" href="theme.css?v=20261021a">
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
 <style>
   /* 页面私有样式;共用规格(令牌/画布/顶栏/面板/pill/foot)见 theme.css */
@@ -82,6 +82,7 @@
       <a href="dashboard.html">我的财富<span class="lk">🔒</span></a>
       <a href="cashflow.html">流水<span class="lk">🔒</span></a>
       <a href="holdings.html">持仓<span class="lk">🔒</span></a>
+      <a href="monitor.html">监控<span class="lk">🔒</span></a>
     </nav>
     <div class="mwrap">
       <span class="asof" id="asof"></span>
@@ -96,10 +97,10 @@
   <div class="status" id="status">加载数据中…</div>
 
   <section class="cards">
-    <div class="panel card c-bal"><div class="dk">期末余额 · Balance</div><div class="dv num" id="v-bal">—<small>元</small></div><div class="d" id="d-bal"></div></div>
-    <div class="panel card c-in"><div class="dk">总进账 · In</div><div class="dv num" id="v-in">—<small>元</small></div><div class="d" id="d-in"></div></div>
-    <div class="panel card c-out"><div class="dk">显性支出 · Out</div><div class="dv num" id="v-out">—<small>元</small></div><div class="d" id="d-out"></div></div>
-    <div class="panel card c-net"><div class="dk">净结余 · Net</div><div class="dv num" id="v-net">—<small>元</small></div><div class="d">进账 − 显性支出</div></div>
+    <div class="panel card c-bal" title="口径:当月最后一笔记账的余额字段 = 零钱 + 理财总额 − 信用卡未还。环比拿上一个有账的月比;本月没记账则余额沿用上期"><div class="dk">期末余额 · Balance</div><div class="dv num" id="v-bal">—<small>元</small></div><div class="d" id="d-bal"></div></div>
+    <div class="panel card c-in" title="口径:当月所有记账行 inmoney 求和(工资等实际入账时点记录,不看来源类别)"><div class="dk">总进账 · In</div><div class="dv num" id="v-in">—<small>元</small></div><div class="d" id="d-in"></div></div>
+    <div class="panel card c-out" title="口径:当月 信用卡+房租缴纳+房贷+社保+其他 五类求和;缴纳记负数、归一取绝对值,房租正数=收入不计。理财盈亏/理财转入一律不计入支出"><div class="dk">显性支出 · Out</div><div class="dv num" id="v-out">—<small>元</small></div><div class="d" id="d-out"></div></div>
+    <div class="panel card c-net" title="口径:总进账 − 显性支出,只算能明确写进账本的现金流,不受理财市值波动影响"><div class="dk">净结余 · Net</div><div class="dv num" id="v-net">—<small>元</small></div><div class="d">进账 − 显性支出</div></div>
   </section>
 
   <div class="row2">
@@ -120,7 +121,7 @@
   </div>
 
   <p class="foot">口径说明:账本字段「总出帐/生活开支」会把理财市值波动记进去(如 2026-05 备注含 A股/币亏损),本页一律不用,只呈现进账与显性支出(信用卡+房租+房贷+社保+其他)。支出环比箭头用中性色 —— 支出下降是好事,不标绿也不标红。</p>
-<script src="nav.js?v=20260921a"></script>
-<script src="cashflow.js"></script>
+<script src="nav.js?v=20261018a"></script>
+<script src="cashflow.js?v=20260929d"></script>
 </body>
 </html>

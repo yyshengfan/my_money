@@ -1,4 +1,4 @@
-import { parseFFRows, mergeLedger, parseManual, kindOf, upcoming, fmtCn } from '../src/service/events.service';
+import { parseFFRows, mergeLedger, parseManual, kindOf, upcoming, fmtCn, fixEventZh } from '../src/service/events.service';
 
 // 事件雷达纯函数单测(不联网):ForexFactory 周feed解析 / 台账合并 / 手动行 / 窗口 / 北京时区
 const D = (s: string) => Date.parse(s); // 固定时刻,避免测试依赖 now
@@ -48,6 +48,18 @@ describe('events.service 纯函数', () => {
     const store = { h: mk('h', now + 2 * 864e5, 'H'), l: mk('l', now + 864e5, 'L'), past: mk('p', now - 8 * 864e5, 'H'), p2: mk('p2', now - 2 * 864e5, 'H'), far: mk('f', now + 40 * 864e5, 'H') };
     const out = upcoming(store, [mk('m', now + 864e5, 'M')], now);
     expect(out.map(r => r.url)).toEqual(['p2', 'm', 'h']); // L/超7天过去/超窗排除,上周内(>now-7d)保留供回看,手动并入按 ts 排
+  });
+
+  it('fixEventZh:CAD 错译修正(BOC=加拿大央行非中国银行、Macklem 通译麦克莱姆;他币种不动)', () => {
+    expect(fixEventZh('中国银行行长麦克勒姆讲话', 'CAD')).toBe('加拿大央行行长麦克莱姆讲话');
+    expect(fixEventZh('中国银行公布贷款数据', 'CNY')).toBe('中国银行公布贷款数据'); // 真·中国银行不误伤
+    expect(fixEventZh('美联储主席讲话', 'USD')).toBe('美联储主席讲话');
+  });
+
+  it('fixEventZh:选举类按 en 原题定名(2026-11-02 用户「怎么没有中期选举」:FF 译成「国会选举」)', () => {
+    expect(fixEventZh('国会选举', 'USD', 'Congressional Elections')).toBe('美国中期选举');
+    expect(fixEventZh('总统选举', 'USD', 'Presidential Election')).toBe('美国大选');
+    expect(fixEventZh('国会选举', 'USD')).toBe('国会选举'); // 无原题不猜
   });
 
   it('fmtCn UTC ms → 北京 MM-DD HH:mm(跨日)', () => {

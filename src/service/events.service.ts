@@ -93,6 +93,17 @@ export function kindOf(r: { country?: string; en: string; kind?: string }): 'mac
   return /ETF|SEC|crypto|stablecoin|token|bitcoin|blockchain/i.test(r.en) ? 'crypto' : 'macro';
 }
 
+// 机翻错译按币种事后修正。只进事件表、不进 zhTitle:新闻标题里 BOC 常确指中国银行,币种判据只有事件表有。
+// FF 的 BOC = Bank of Canada(加拿大央行),gtx 曾错译成「中国银行」、Macklem 打成「麦克勒姆」(2026-10-12 用户抓包)。
+export function fixEventZh(zh: string, country?: string, en?: string): string {
+  // 政治事件的机翻太糊(2026-11-02 用户「事件雷达里怎么没有中期选举」:FF 原题 Congressional Elections 被译成「国会选举」)
+  const e = String(en || '');
+  if (/congressional election/i.test(e)) return '美国中期选举';
+  if (/presidential election/i.test(e)) return '美国大选';
+  if (country === 'CAD') return zh.replace(/中国银行/g, '加拿大央行').replace(/麦克勒姆/g, '麦克莱姆');
+  return zh;
+}
+
 // 展示窗口:H/M 级、ts ∈ (now-7天, now+days](已过去一周保留供上滑回看,过去用灰色分层)、含手动、按时间排
 export function upcoming(store: Record<string, EvRow>, manual: EvRow[], nowMs: number, days = 14) {
   const lo = nowMs - 7 * 864e5, hi = nowMs + days * 864e5;
@@ -131,7 +142,7 @@ export class EventsService {
             kind: kindOf(r),
             day,
             hh,
-            title: await zhTitle(r.en).catch(() => r.en), // Low 已在 upcoming 滤掉,只翻展示行
+            title: fixEventZh(await zhTitle(r.en).catch(() => r.en), r.country, r.en), // Low 已在 upcoming 滤掉,只翻展示行
           };
         })
       );

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>币圈</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
-<link rel="stylesheet" href="theme.css?v=20260921a">
+<link rel="stylesheet" href="theme.css?v=20261021a">
 <style>
   /* 页面私有样式;共用规格见 theme.css */
   main{display:grid;gap:14px}
@@ -105,7 +105,7 @@
   .newsgrid{display:grid;grid-template-columns:1fr 300px;gap:0}
   @media(max-width:900px){.newsgrid{grid-template-columns:1fr}}
   .news{display:grid;align-content:start;padding:4px 20px 8px 18px}
-  /* 资讯行改时间线编排(2026-09-20),行样式共用 theme.css .tl*;原 .news li 系列已删 */
+  /* 资讯行改今日信号式滚动卡(2026-10-21),共用 theme.css .slw/.sln;旧 .news li/.tl* 系列均已删 */
   .news .tm b{color:var(--asset);font-weight:600}
   .macro{display:grid;align-content:start;gap:3px;padding:12px 18px 14px 20px;border-left:1px solid var(--border)}
   @media(max-width:900px){.macro{border-left:none;border-top:1px solid var(--border);padding-top:12px}}
@@ -197,6 +197,7 @@
     <a href="dashboard.html">我的财富<span class="lk">🔒</span></a>
     <a href="cashflow.html">流水<span class="lk">🔒</span></a>
     <a href="holdings.html">持仓<span class="lk">🔒</span></a>
+    <a href="monitor.html">监控<span class="lk">🔒</span></a>
   </nav>
   <div class="pills"><button id="refresh">刷新</button></div>
   <div class="who" id="who"></div>
@@ -204,7 +205,7 @@
 <div class="status" id="status">加载数据中…</div>
 
 <main>
-  <section class="panel">
+  <section class="panel" id="c-mkt">
     <div class="phead"><div class="eyebrow">现货与市值</div><h2>市场概览</h2></div>
     <div class="src" id="src-market"></div>
     <div class="ovleft">
@@ -214,16 +215,16 @@
   </section>
 
   <div class="fundrow mrow">
-    <section class="panel mcappanel">
+    <section class="panel mcappanel" id="c-mcap">
       <div class="mcaps" id="mcaps"></div>
     </section>
-    <section class="panel">
+    <section class="panel" id="c-fng">
       <div class="phead"><div class="eyebrow">恐慌贪婪指数 · 近30天</div><h2>恐慌贪婪指数</h2></div>
       <div class="src" id="src-fng"></div>
       <div id="fng" class="fng-chart"></div>
       <div class="fng-now" id="fng-now"></div>
     </section>
-    <section class="panel">
+    <section class="panel" id="c-funding">
       <div class="phead"><div class="eyebrow">永续资金费率 · 每8h结算</div><h2>资金费率走势(每所一线)</h2></div>
       <div class="src" id="src-funding"></div>
       <div class="fpills" id="funding-pills"></div>
@@ -232,7 +233,7 @@
     </section>
   </div>
 
-  <section class="panel">
+  <section class="panel" id="c-oi">
     <div class="phead"><div class="eyebrow">未平仓合约 OI · 币安/欧易/Bybit 永续</div><h2>全平台主要币种 OI 走势(每所一线 + 合计)</h2></div>
     <div class="src" id="src-oi"></div>
     <div class="fpills" id="oi-pills"></div>
@@ -240,13 +241,13 @@
     <div class="fnote" id="oi-note"></div>
   </section>
 
-  <section class="panel">
+  <section class="panel" id="c-book">
     <div class="phead"><div class="eyebrow">合约挂单 · 币安永续千档盘口 · 60s 快照</div><h2>「大户在哪挂单」</h2></div>
     <div class="src" id="src-book"></div>
     <div class="chainbox" id="book"></div>
   </section>
 
-  <section class="panel">
+  <section class="panel" id="c-etf">
     <div class="phead"><div class="eyebrow">ETF 资金流</div><h2>BTC / ETH 现货 ETF 净流入</h2></div>
     <div class="src" id="src-etf"></div>
     <div class="etf-sum" id="etf-sum"></div>
@@ -255,27 +256,28 @@
   </section>
 
   <div class="fundrow">
-    <section class="panel">
+    <section class="panel" id="c-chain">
       <div class="phead"><div class="eyebrow">链上数据</div><h2>「聪明钱在干什么」</h2></div>
       <div class="src" id="src-chain"></div>
       <div class="chainbox" id="chain"></div>
     </section>
-    <section class="panel">
+    <section class="panel" id="c-risk">
       <div class="phead"><div class="eyebrow">风险监控</div><h2>「现在有什么可能出事」</h2></div>
       <div class="risk" id="risk"></div>
       <div class="fnote">规则由本页已取数据实时判定(默认看 BTC 费率):永续费率极值、主流 24h 波幅、情绪极值、BTC 链上拥堵。绿=正常,黄=关注,红=风险信号,仅供参考不构成建议。</div>
     </section>
   </div>
 
-  <section class="panel">
+  <section class="panel" id="c-ann">
     <div class="phead"><div class="eyebrow">活动 / 机会</div><h2>交易所活动与机会</h2></div>
     <div class="src" id="src-ann"></div>
     <div class="ann" id="ann"></div>
     <div class="fnote"><span class="hot">机会</span> = 真有肉的活动:新币上线 / 交易大赛·瓜分奖池 / 空投 / 返佣减免 / 写明数值的年化。关键词启发式判定,参与前点开原文核实细则,不构成建议。</div>
   </section>
 
-  <section class="panel">
-    <div class="phead"><div class="eyebrow">相关新闻 &amp; 宏观</div><h2>「为什么今天涨跌」</h2></div>
+  <!-- 相关新闻(2026-10-21 版式改今日信号式滚动卡、曾上移到市场概览后;2026-10-22 用户「币圈也有同样的问题」——挪回页尾原位,勿再挪) -->
+  <section class="panel" id="c-news">
+    <div class="phead"><div class="eyebrow">相关新闻 &amp; 宏观 · 圆点=重要程度(红 主流币/监管/安全 · 琥珀 交易所/代币/宏观 · 灰 其他)· 上下滑动</div><h2>「为什么今天涨跌」</h2></div>
     <div class="src" id="src-news"></div>
     <div class="newsgrid">
       <div class="news" id="news"></div>
@@ -283,11 +285,11 @@
     </div>
   </section>
 
-  <p class="foot">公开接口、免登录、服务端 30s 缓存。现货:BTC/ETH/SOL/BNB 走币安大陆镜像,OKB 走 OKX;市值与占比走 CoinGecko;恐慌贪婪来自 alternative.me;永续资金费率:BTC/ETH/BNB × 币安(fapi)/欧易/Bitget/Bybit,标记价与结算时间以各所为准,合约域大陆可能不可达,失败会标注而非白屏。活动/机会:BTC/ETH/SOL/BNB 之外的四个交易所(币安/欧易/Bybit/Bitget)各取 3 条,欧易/Bitget 原生中文,币安/Bybit 官方仅英文接口、标题由服务端转简体。ETF 资金流仅 BTC/ETH(现货 ETF;SOL/BNB/OKB 无 ETF),数据来自第三方免费源(延后 1 日),曲线自接入日起由本机逐日累积,仅供自用参考,非投资建议。相关新闻 &amp; 宏观:资讯来自 Cointelegraph RSS(免 key,标题服务端转简体,点开看英文原文),右侧宏观清单由本页上述接口现算;美股/美元指数/黄金等传统宏观在「免 key」限制下无稳定免费源,暂缺。链上:稳定币总供给来自 DefiLlama、BTC 实时手续费档来自 mempool.space——免 key 口径下「聪明钱」的可靠近似(交易所净流入、巨鲸地址追踪需付费源,此处不做假数)。风险监控为上述数据的规则判定,仅供参考。</p>
+  <p class="foot">公开接口、免登录、服务端 30s 缓存。现货:BTC/ETH/SOL/BNB/DOGE 走币安大陆镜像,OKB 走 OKX;市值与占比走 CoinGecko;恐慌贪婪来自 alternative.me;永续资金费率:BTC/ETH/BNB × 币安(fapi)/欧易/Bitget/Bybit,标记价与结算时间以各所为准,合约域大陆可能不可达,失败会标注而非白屏。活动/机会:BTC/ETH/SOL/BNB 之外的四个交易所(币安/欧易/Bybit/Bitget)各取 3 条,欧易/Bitget 原生中文,币安/Bybit 官方仅英文接口、标题由服务端转简体。ETF 资金流仅 BTC/ETH(现货 ETF;SOL/BNB/OKB 无 ETF),数据来自第三方免费源(延后 1 日),曲线自接入日起由本机逐日累积,仅供自用参考,非投资建议。相关新闻 &amp; 宏观:资讯来自 Cointelegraph RSS(免 key,标题服务端转简体,点开看英文原文),右侧宏观清单由本页上述接口现算;美股/美元指数/黄金等传统宏观在「免 key」限制下无稳定免费源,暂缺。链上:稳定币总供给来自 DefiLlama、BTC 实时手续费档来自 mempool.space——免 key 口径下「聪明钱」的可靠近似(交易所净流入、巨鲸地址追踪需付费源,此处不做假数)。风险监控为上述数据的规则判定,仅供参考。</p>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
-<script src="nav.js?v=20260921a"></script>
-<script src="crypto.js?v=20260922d"></script>
+<script src="nav.js?v=20261018a"></script>
+<script src="crypto.js?v=20261022a"></script>
 <script src="stats.js?v=20260920d"></script>
 </body>
 </html>
