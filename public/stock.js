@@ -204,7 +204,8 @@ function mergeRows(W, R) {
 const wCell = (r, k) =>
   k === 'name' || k === 'code' ? String(r[k] || '') :
     k === 'hold' ? (r.hold ? 1 : 0) :
-      /^d(7|30|90|180|365)$/.test(k) ? ((r.pc || {})[k] ?? null) : r[k];
+      k === 'score' ? (r.sc ? r.sc.total : null) :
+        /^d(7|30|90|180|365)$/.test(k) ? ((r.pc || {})[k] ?? null) : r[k];
 // 列排序:k='' 保持传入序(默认类别序);空值恒沉底(不随方向翻);同列再点靠 d 翻向
 function sortRows(rows, k, d) {
   if (!k) return rows.slice();
@@ -220,6 +221,48 @@ function sortRows(rows, k, d) {
 function filterRows(rows, f) {
   return f === 'hold' ? rows.filter(r => r.hold) : f === 'watch' ? rows.filter(r => !r.hold) : rows.slice();
 }
+
+// ---- 股票分类 + 综合评分(2026-11-05 用户要求:按主板/科创板/ETF 分类,按多因子综合分排序) ----
+// 分类只看代码/市场,不做行业归类(stkCat 那套另算):六位 A 股码、5xx/15x/16x 场内 ETF、12x 深转债、五位港股码
+const BOARD_ORDER = ['主板', '科创板', '创业板', 'ETF', '港股', '可转债', '其他'];
+function boardOf(r) {
+  const c = String((r && r.code) || '');
+  const m = String((r && r.hold && r.hold.market) || '');
+  if (/港/.test(m) || /^\d{5}$/.test(c)) return '港股';
+  if (/^(5\d{5}|1[56]\d{4})$/.test(c)) return 'ETF';
+  if (/^(11|12|13)\d{4}$/.test(c)) return '可转债';
+  if (/^(688|689)/.test(c)) return '科创板';
+  if (/^(300|301)/.test(c)) return '创业板';
+  if (/^(60|000|001|002|003)/.test(c)) return '主板';
+  return '其他';
+}
+
+// 五因子 5 分制加权,缺项剔权归一(同 marketTemp/mktTemp 路数)。因子全部是免费源能拿到的代理:
+//   估值=动态 PE、分红=现价股息率、财务=PB(无逐票财报免费源)、景气=90 日动量(无板块席位)、值博=120 日区间位置
+const SCORE_W = { val: 20, div: 15, fin: 15, pros: 25, odds: 25 };
+const SCORE_LB = { val: '估值', div: '分红', fin: '财务', pros: '景气', odds: '值博' };
+function scoreRow(r) {
+  const h = (r && r.hold) || {}, pc = (r && r.pc) || {}, tech = h.tech || {}, rs = h.rs || {};
+  const parts = {};
+  const pe = numOrNull(r && r.pe != null ? r.pe : h.pe);
+  if (pe != null) parts.val = pe <= 0 ? 0 : pe <= 10 ? 5 : pe <= 15 ? 4.2 : pe <= 25 ? 3.4 : pe <= 40 ? 2.4 : pe <= 60 ? 1.4 : 0.6;
+  const yl = numOrNull(h.div && h.div.yl);
+  if (yl != null) parts.div = yl >= 5 ? 5 : yl >= 3.5 ? 4.2 : yl >= 2.5 ? 3.4 : yl >= 1.5 ? 2.4 : yl >= 0.8 ? 1.4 : yl > 0 ? 0.6 : 0;
+  const pb = numOrNull(r && r.pb != null ? r.pb : h.pb);
+  if (pb != null) parts.fin = pb <= 0 ? 0 : pb <= 1 ? 5 : pb <= 1.5 ? 4.2 : pb <= 2.5 ? 3.4 : pb <= 4 ? 2.4 : pb <= 6 ? 1.4 : 0.6;
+  const d90 = numOrNull(pc.d90);
+  if (d90 != null) parts.pros = d90 >= 20 ? 5 : d90 >= 10 ? 4.2 : d90 >= 3 ? 3.4 : d90 >= -3 ? 2.4 : d90 >= -10 ? 1.4 : 0.5;
+  const pos = numOrNull(rs.pos);
+  if (pos != null) parts.odds = pos <= 20 ? 5 : pos <= 35 ? 4.2 : pos <= 50 ? 3.4 : pos <= 65 ? 2.4 : pos <= 80 ? 1.4 : 0.6;
+  else {
+    const d365 = numOrNull(pc.d365);
+    if (d365 != null) parts.odds = d365 <= -40 ? 5 : d365 <= -25 ? 4.2 : d365 <= -10 ? 3.4 : d365 <= 0 ? 2.6 : d365 <= 15 ? 1.8 : d365 <= 30 ? 1.1 : 0.5;
+  }
+  let s = 0, w = 0;
+  for (const k in SCORE_W) if (parts[k] != null) { s += parts[k] * SCORE_W[k]; w += SCORE_W[k]; }
+  return { total: w ? Math.round(s / w * 100) / 100 : null, parts, used: w };
+}
+
 // ---------- 浏览器渲染 ----------
 if (typeof window !== 'undefined') {
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -589,8 +632,8 @@ if (typeof window !== 'undefined') {
   const rngBar = p => p == null ? '<span class="dim">—</span>'
     : `<span class="rng ${p >= 66 ? 'hi' : p <= 33 ? 'lo' : ''}"><span class="track"><span class="dot" style="left:${Math.min(96, Math.max(4, p))}%"></span></span><b>${p.toFixed(0)}%</b></span>`;
   const anaRow = a => !a.tech
-    ? `<tr class="ana"><td colspan="16"><span class="dim">✗ ${esc(a.error || '分析无数据')}</span></td></tr>`
-    : `<tr class="ana ${a.verdict.tone}"><td colspan="16">` +
+    ? `<tr class="ana"><td colspan="17"><span class="dim">✗ ${esc(a.error || '分析无数据')}</span></td></tr>`
+    : `<tr class="ana ${a.verdict.tone}"><td colspan="17">` +
       `<span class="vt">${esc(a.verdict.text)}</span>` +
       `<span class="facts">${[
         a.tech.maBull && '均线多头',
@@ -610,6 +653,7 @@ if (typeof window !== 'undefined') {
     if (RECAP) bd['持仓复盘'] = RECAP;
     document.getElementById('src-watch').innerHTML = srcBadges(bd);
     const all = mergeRows(res && res.ok ? res.data : null, RECAP && RECAP.ok ? RECAP.data.rows : null);
+    for (const r of all) { r.board = boardOf(r); r.sc = scoreRow(r); }
     if (!all.length) {
       el.innerHTML = `<div class="err">✗ 行情:${esc((res && res.error) || '不可用')};复盘:${esc((RECAP && RECAP.error) || '不可用')}——稍后自动重试</div>`;
       return;
@@ -623,17 +667,34 @@ if (typeof window !== 'undefined') {
     const na = '<span class="dim">—</span>';
     const sh =(k, lb, t) => `<th class="srt${WSORT.k === k ? ' on' + (WSORT.d > 0 ? ' asc' : '') : ''}" data-k="${k}"${t ? ` title="${t} · 点击排序"` : ' title="点击排序"'}>${lb}</th>`;
     let rows = filterRows(all, WFILT);
-    rows = WSORT.k ? sortRows(rows, WSORT.k, WSORT.d) : rows.sort((a, b) => STOCK_ORDER.indexOf(stkCat(a.name, a.cat)) - STOCK_ORDER.indexOf(stkCat(b.name, b.cat)) || String(a.name).localeCompare(String(b.name), 'zh'));
+    // 默认排序=综合评分降序(2026-11-05 用户要求),再按板块分组;点表头则按该列排、组内保持
+    rows = WSORT.k ? sortRows(rows, WSORT.k, WSORT.d) : rows.slice().sort((a, b) => {
+      const x = a.sc.total, y = b.sc.total;
+      if (x == null && y == null) return String(a.name).localeCompare(String(b.name), 'zh');
+      if (x == null) return 1;
+      if (y == null) return -1;
+      return y - x || String(a.name).localeCompare(String(b.name), 'zh');
+    });
+    const groups = BOARD_ORDER.map(b => [b, rows.filter(r => r.board === b)]).filter(g => g[1].length);
+    const scTd = r => {
+      const sc = r.sc || {};
+      if (sc.total == null) return `<td class="sc">${na}</td>`;
+      const cls = sc.total >= 4 ? 'hi' : sc.total >= 3 ? 'mid' : 'lo';
+      const got = Object.keys(SCORE_LB).filter(k => sc.parts[k] != null).map(k => `${SCORE_LB[k]} ${sc.parts[k].toFixed(1)}`).join(' · ');
+      const miss = Object.keys(SCORE_LB).filter(k => sc.parts[k] == null).map(k => SCORE_LB[k]).join('/');
+      return `<td class="sc ${cls}" title="${esc(got)}${miss ? ' · 缺' + esc(miss) + '(已剔权重)' : ''}">${sc.total.toFixed(2)}</td>`;
+    };
     const nHold = all.filter(r => r.hold).length;
     el.innerHTML = `<div class="pills wfil">` +
       [['all', '全部', all.length], ['hold', '仅持仓', nHold], ['watch', '仅自选', all.length - nHold]].map(([f, lb, n]) =>
         `<button type="button"${WFILT === f ? ' class="on"' : ''} data-f="${f}">${lb} ${n}</button>`).join('') +
       `<span class="dim">点表头排序</span></div>` +
       `<div class="tscroll"><table class="ftab"><thead><tr class="gh">` +
-      `<th colspan="2">标的</th><th colspan="2">今日行情</th>` +
+      `<th colspan="3">标的</th><th colspan="2">今日行情</th>` +
       `<th colspan="5" title="前复权日K,含分红">区间涨跌</th><th colspan="4">估值 · 规模</th>` +
       `<th colspan="3" title="仅持仓行有值">持仓复盘</th></tr><tr>` +
       sh('name', '股票名称') + sh('code', '代码') +
+      sh('score', '评分', '综合评分(5 分制):估值 PE·分红股息率·财务 PB·景气 90日动量·值博 120日区间位置,加权后缺项剔权归一;悬停看各因子拆解') +
       sh('price', '现价', '最新价(腾讯实时;持仓行悬停带涨跌额与行情时间)') +
       sh('day', '今日涨跌', '今日涨跌幅(腾讯实时)') +
       sh('d7', '7日', '近7个交易日(含分红)') + sh('d30', '30日', '近30日(含分红)') + sh('d90', '90日', '近90日(含分红)') +
@@ -643,11 +704,16 @@ if (typeof window !== 'undefined') {
       `<th title="现价在 120 日高低区间的位置(技术面复盘用)">120日区</th>` +
       `<th title="技术面逻辑变化:利好/风险/无变化(120日K规则判定)">逻辑</th>` +
       `</tr></thead><tbody>` +
-      (rows.length ? rows.map(r => {
-        const pc = r.pc || {}, h = r.hold, div = h && h.div;
-        return `<tr class="main">
+      (groups.length ? groups.map(([b, grp]) => {
+        const vals = grp.map(r => r.sc.total).filter(v => v != null);
+        const avg = vals.length ? vals.reduce((a, v) => a + v, 0) / vals.length : null;
+        return `<tr class="bgrp"><td colspan="17"><b>${b}</b><span>${grp.length} 只${avg == null ? '' : ` · 均分 ${avg.toFixed(2)}`}</span></td></tr>` +
+          grp.map(r => {
+            const pc = r.pc || {}, h = r.hold, div = h && h.div;
+            return `<tr class="main">
           <td class="nm" title="${esc(r.name)}">${esc(r.name)}<span class="fx">${stkCat(r.name, r.cat)}</span>${h ? '<span class="fx on">持仓</span>' : ''}</td>
           <td>${esc(r.code)}</td>
+          ${scTd(r)}
           <td${h ? ` title="涨跌额 ${h.chg == null ? '—' : stkCur(h.market) + sign2(h.chg)} · 行情时间 ${esc(fmtQuoteTime(h.time))}"` : ''}>${n2(r.price, 2)}</td>
           <td>${fp2(r.day)}</td>
           <td>${fp2(pc.d7)}</td>
@@ -663,7 +729,8 @@ if (typeof window !== 'undefined') {
           <td>${h && h.tech ? rngBar(h.rs.pos) : na}</td>
           <td>${h && h.tech ? `<span class="tg ${h.tag}" title="${esc(h.tagWhy)}"><i></i>${h.tag === 'good' ? '利好' : h.tag === 'risk' ? '风险' : '无变化'}</span>` : na}</td>
         </tr>` + (h && (h.tech || h.error) ? anaRow(h) : '');
-      }).join('') : '<tr><td colspan="16" class="dim" style="text-align:center;padding:18px">该筛选下暂无标的</td></tr>') +
+          }).join('');
+      }).join('') : '<tr><td colspan="17" class="dim" style="text-align:center;padding:18px">该筛选下暂无标的</td></tr>') +
       '</tbody></table></div>';
   }
 
@@ -954,6 +1021,18 @@ function selftest() {
     A(sortRows(rs, '', -1).length === 3 && sortRows(rs, '', -1)[0].name === 'b', 'sortRows k="" 保持传入序');
     A(filterRows(rs, 'hold').length === 1 && filterRows(rs, 'watch').length === 2 && filterRows(rs, 'all').length === 3, 'filterRows 全部/仅持仓/仅自选');
   }
+
+  // 板块分类 + 综合评分(2026-11-05):主板/创业板/科创板/ETF/港股/可转债按代码判,不靠名称
+  A(boardOf({ code: '600219' }) === '主板' && boardOf({ code: '002050' }) === '主板', 'boardOf 沪深主板');
+  A(boardOf({ code: '300760' }) === '创业板' && boardOf({ code: '688825' }) === '科创板', 'boardOf 创业板/科创板');
+  A(boardOf({ code: '159382' }) === 'ETF' && boardOf({ code: '513100' }) === 'ETF' && boardOf({ code: '520570' }) === 'ETF', 'boardOf 场内 ETF(深15/沪5)');
+  A(boardOf({ code: '127120' }) === '可转债' && boardOf({ code: '02331' }) === '港股' && boardOf({ code: '09626', hold: { market: '港股' } }) === '港股', 'boardOf 转债/港股');
+  const sGood = scoreRow({ code: '600036', pe: 7, pb: 1.1, pc: { d90: 12, d365: 5 }, hold: { div: { yl: 4 }, rs: { pos: 30 }, tech: {} } });
+  const sBad = scoreRow({ code: '002230', pe: 101, pb: 5, pc: { d90: -20, d365: 40 }, hold: { div: { yl: 0 }, rs: { pos: 90 }, tech: {} } });
+  A(sGood.total > 4 && sBad.total < 2 && sGood.total > sBad.total, 'scoreRow 五因子:低估值高股息低位 > 高估值弱势高位');
+  const sWatch = scoreRow({ code: '002563', pe: 15, pb: 1.2, pc: { d90: 5 } });
+  A(sWatch.used === 60 && sWatch.parts.div == null && sWatch.parts.odds == null && sWatch.total > 0, 'scoreRow 观察行缺分红/值博→剔权归一(60 分权重)');
+  A(scoreRow({ code: 'x' }).total === null, 'scoreRow 全缺→null 显 —');
 
   console.log('stock.js selftest OK');
 }

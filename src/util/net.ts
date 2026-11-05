@@ -39,7 +39,7 @@ function ensureProxyEnv() {
   if (!p) return;
   process.env.HTTPS_PROXY = process.env.HTTPS_PROXY || p;
   process.env.HTTP_PROXY = process.env.HTTP_PROXY || p;
-  process.env.NO_PROXY = ['gtimg.cn', '127.0.0.1', 'localhost', process.env.NO_PROXY]
+  process.env.NO_PROXY = ['gtimg.cn', 'finance.qq.com', '127.0.0.1', 'localhost', process.env.NO_PROXY]
     .filter(Boolean)
     .join(',');
 }
@@ -64,6 +64,27 @@ export async function getJson(
   headers?: Record<string, string>
 ): Promise<any> {
   return JSON.parse(Buffer.from(await request(url, ms, headers)).toString('utf8'));
+}
+
+// 腾讯日K专用:web.ifzq 的 fqkline 路径被 WAF 整段 501(2026-11-05 实测,镜像同挂;同主机 minute/query、newfqkline 仍通)
+// → 统一改走 newfqkline(参数与回包同形,qfqday/day 键一致),再失败落镜像 proxy.finance.qq.com/ifzqgtimg。
+// ⚠️ 必须 proxy:false 直连:axios 对本机 NO_PROXY 不生效,走代理出口会被腾讯 WAF 回 501(实测)
+async function getJsonDirect(url: string, ms = 8000): Promise<any> {
+  const res = await axios.get(url, {
+    timeout: ms,
+    responseType: 'arraybuffer',
+    headers: { 'user-agent': UA },
+    proxy: false,
+  });
+  return JSON.parse(Buffer.from(res.data).toString('utf8'));
+}
+export async function getKlineJson(url: string, ms = 9000): Promise<any> {
+  const u = url.replace('/appstock/app/fqkline/get', '/appstock/app/newfqkline/get');
+  try {
+    return await getJsonDirect(u, ms);
+  } catch {
+    return getJsonDirect(u.replace('web.ifzq.gtimg.cn/', 'proxy.finance.qq.com/ifzqgtimg/'), ms);
+  }
 }
 
 export async function getBuffer(

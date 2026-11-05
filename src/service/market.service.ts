@@ -1,7 +1,7 @@
 import { Provide, Inject } from '@midwayjs/core';
 import { readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import { getBuffer, getJson, cached } from '../util/net';
+import { getBuffer, getJson, getKlineJson, cached } from '../util/net';
 import { dedupeNews } from '../util/news';
 import { QtService, quoteCode } from './qt.service';
 
@@ -590,7 +590,7 @@ export class AShareService {
       const kl = await Promise.all(pre.map(r => {
         const t = String(r.code || '').startsWith('6') ? 'sh' : 'sz'; // A股首位判市,同 qt.service
         return safe(async () => {
-          const j = await getJson(`https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param=${t}${r.code},day,,,120,qfq`, 9000);
+          const j = await getKlineJson(`https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param=${t}${r.code},day,,,120,qfq`, 9000);
           const d = j?.data?.[`${t}${r.code}`];
           return parseTencentKline(d?.qfqday || d?.day || []);
         });
@@ -658,7 +658,7 @@ export class AShareService {
       const qtm: any = await safe(async () => this.qtService.quotes(list.map(f => tc(f.code))));
       const pcs = await Promise.all(list.map(f =>
         safe(async () => {
-          const j: any = await getJson(
+          const j: any = await getKlineJson(
             `https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param=${tc(f.code)},day,,,320,qfq`, 9000
           );
           const raw = j?.data?.[tc(f.code)]?.qfqday || j?.data?.[tc(f.code)]?.day || [];

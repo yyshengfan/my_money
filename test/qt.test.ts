@@ -62,5 +62,9 @@ describe('qt.service', () => {
     expect(quoteCode('300760', 'A股·深')).toBe('sz300760');
     expect(quoteCode('02331', '港股')).toBe('hk02331');
     expect(quoteCode('09626', '港股')).toBe('hk09626');
+    // ETF 5xx / 沪转债 11x 靠首位判会错,以 market 为准
+    expect(quoteCode('513100', 'A股·沪')).toBe('sh513100');
+    expect(quoteCode('159382', 'A股·深')).toBe('sz159382');
+    expect(quoteCode('110059', 'A股·沪')).toBe('sh110059');
   });
 });

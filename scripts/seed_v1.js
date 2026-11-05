@@ -24,7 +24,7 @@ const conn = mysql.createConnection({
 });
 
 const sql = fs.readFileSync(path.join(__dirname, '../data/mysql.sql'), 'utf8');
-const seg = sql.slice(sql.indexOf('-- ===== 四板块 v1'));
+const seg = sql.slice(sql.indexOf('-- ===== 四板块 v1'), sql.indexOf('-- ===== 浏览统计'));
 if (!seg) {
   console.error('data/mysql.sql 里找不到「四板块 v1」段');
   process.exit(1);

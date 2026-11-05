@@ -12,7 +12,7 @@ import { klineInd, parseTencentKline, periodChg } from './market.service';
 // periodChg 已挪到 market.service(股票观察 watch() 同用,避免 market→holding 循环引用);此处 re-export,test/holding.test.ts 与各调用方不动
 export { periodChg };
 import { binance24h } from './crypto.service';
-import { getJson } from '../util/net';
+import { getJson, getKlineJson } from '../util/net';
 import { DEMO_CRY, DEMO_STK } from './demo';
 
 /*
@@ -584,7 +584,7 @@ export class HoldingService {
             `https://datacenter-web.eastmoney.com/api/data/v1/get?reportName=RPT_SHAREBONUS_DET&columns=ALL&pageSize=1&sortColumns=EX_DIVIDEND_DATE&sortTypes=-1&filter=(SECURITY_CODE%3D%22${tc.slice(2)}%22)`, 9000
           ));
           // 320 根 ≈ 覆盖 365 自然日(一年涨跌幅);rangeStats 截末 120 保持「120日区」语义不变
-          const j = await getJson(
+          const j = await getKlineJson(
             `https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param=${tc},day,,,320,qfq`, 9000
           );
           const raw = j?.data?.[tc]?.qfqday || j?.data?.[tc]?.day || [];

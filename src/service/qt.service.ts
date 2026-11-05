@@ -54,9 +54,11 @@ export function parseTencent(text: string): Record<string, QtRow> {
   return out;
 }
 
-// 持仓行 → 腾讯代码:港股 5 位码加 hk;A股按首位 6→sh、其余→sz
+// 持仓行 → 腾讯代码:港股 5 位码加 hk;A股优先看 market 的沪/深标注(ETF 5xx、转债 11x 靠首位判会错),没标就按首位 6→sh、其余→sz
 export function quoteCode(code: string, market: string): string {
   if (market.indexOf('港') >= 0) return 'hk' + code;
+  if (market.indexOf('沪') >= 0) return 'sh' + code;
+  if (market.indexOf('深') >= 0) return 'sz' + code;
   return (code.startsWith('6') ? 'sh' : 'sz') + code;
 }
 

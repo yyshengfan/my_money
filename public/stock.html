@@ -201,6 +201,12 @@
   .ftab th.srt.on{color:#7fb0ff}
   .ftab th.srt.on::after{content:' ▾';font-size:9px}
   .ftab th.srt.on.asc::after{content:' ▴'}
+  /* 板块分类组头 + 综合评分列(2026-11-05 用户要求:主板/科创板/ETF 分类、按综合评分排序) */
+  .ftab tr.bgrp td{background:#0f1621;border-top:1px solid #1c2531;border-bottom:1px solid #1c2531;padding:7px 18px;text-align:left;white-space:nowrap}
+  .ftab tr.bgrp b{font:600 11px/1 var(--mono);letter-spacing:.12em;color:#7fb0ff}
+  .ftab tr.bgrp span{margin-left:10px;font:400 11px/1 var(--mono);color:#5f7186;letter-spacing:.02em}
+  .ftab td.sc{font-weight:700}
+  .ftab td.sc.hi{color:#7fb0ff} .ftab td.sc.mid{color:#d9b45a} .ftab td.sc.lo{color:#6b7789}
   .wfil{margin:14px 18px 6px;align-items:center}
   .wfil .dim{margin-left:8px;font:400 11px/1 var(--mono)}
   #watch .err{color:var(--down)}
@@ -461,7 +467,7 @@
   <p class="foot">数据源(免 key):指数行情/成交额来自腾讯 qt,涨跌家数、行业板块、涨停池、全A 排行与资讯来自东方财富公开接口;服务端缓存 60s。涨跌配色全站统一绿涨红跌。「今日机会」分两派:价值派走妙想 MX 基本面选股(免费基本面唯一源,盘中每小时一刷,东财不可用时资讯/机会兜底同理),趋势派由东财全A候选 + 腾讯日K 在服务端本地计算 MA/MACD/RSI/量能(腾讯行情走直连,不受东财限流影响);两派均为启发式评分,免费源覆盖不到的项(一票否决四项、5年估值分位、板块20日涨幅等)已在③卡注记列明,非投资建议。两市主力净额分时/日线取自东财 fflow 接口(深市经延迟镜像,日线仅沪市)。东方财富接口对本网络偶发限流,失败会在对应卡片标 ✗,过 1-2 分钟刷新即恢复;资讯「政策/市场/公司」标签仅为关键词粗分,非精准影响对象。妙想选股等增强源留待后续。</p>
 </main>
 <script src="nav.js?v=20261018a"></script>
-<script src="stock.js?v=20261029a"></script>
+<script src="stock.js?v=20261105a"></script>
 <script src="stats.js?v=20260920d"></script>
 </body>
 </html>

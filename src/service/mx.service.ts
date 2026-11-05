@@ -2,7 +2,7 @@ import { Provide } from '@midwayjs/core';
 import { readFileSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
-import { getJson, postJson, cached } from '../util/net';
+import { getKlineJson, postJson, cached } from '../util/net';
 import { dedupeNews } from '../util/news';
 import { parseTencentKline, klineInd } from './market.service';
 
@@ -230,7 +230,7 @@ export class MxService {
     const code = String(raw || '').match(/\d{6}/)?.[0] || ''; // MX 代码列可能带 .SH/SH 前后缀,只取6位数字
     if (code.length !== 6) throw new Error(`代码无法解析:${raw}`);
     const t = code.startsWith('6') ? 'sh' : 'sz';
-    const j: any = await getJson(`https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param=${t}${code},day,,,120,qfq`, 9000);
+    const j: any = await getKlineJson(`https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param=${t}${code},day,,,120,qfq`, 9000);
     const d = j?.data?.[`${t}${code}`];
     const { aboveMa20, chg20 } = klineInd(parseTencentKline(d?.qfqday || d?.day || []));
     return { aboveMa20, chg20 };

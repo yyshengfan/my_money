@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>异动监控</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="stylesheet" href="theme.css?v=20261021a">
+<style>
+  /* 页面私有样式;共用规格见 theme.css。监控看板三块:①实时看板 ②任务配置 ③推送历史 */
+  .tscroll{overflow-x:auto}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{text-align:right;font:500 10.5px/1 var(--mono);letter-spacing:.06em;color:#5f6f80;padding:11px 14px 9px;border-bottom:1px solid var(--border);white-space:nowrap}
+  th small{font-weight:400;letter-spacing:0;text-transform:none;color:#48586a}
+  th:first-child,td:first-child{text-align:left}
+  td{padding:10px 14px;text-align:right;white-space:nowrap;font-family:var(--mono);font-variant-numeric:tabular-nums;border-bottom:1px solid #151c26}
+  td.nm{text-align:left;font-family:var(--sans);font-weight:600;font-size:13.5px}
+  td.txt{text-align:left;font-family:var(--sans);color:#9db1c7;white-space:normal;min-width:0}
+  .pos{color:var(--up)} .neg{color:var(--down)} .na{color:#5f6f80}
+  /* 2026-10-19 UI 优化:阈值读数改「规」——填充 ∝|读数|/阈值,离触发线多远一眼可辨(绿涨红跌、越限琥珀同 pill.fire) */
+  th.gl{text-align:left}
+  .gzc{text-align:left;display:inline-block;min-width:88px} /* 88=双栏每列 ~690 时六列表不横滑的顶格宽 */
+  .gzc .vline{display:block}
+  small.rl{display:block;font:400 10px/1.4 var(--mono);color:#5f6f80;letter-spacing:0}
+  .gz,.rg{position:relative;display:block;height:6px;width:88px;background:#10161f;border:1px solid #1a222e;border-radius:3px;margin-top:4px}
+  .gz .mid{position:absolute;top:-1px;bottom:-1px;left:50%;width:1px;background:#3d4f63} /* 双向规中线=0 */
+  .gz .mid.r{left:0}
+  .gz b{position:absolute;top:0;bottom:0;border-radius:2px}
+  .rg b{position:absolute;top:-1px;width:8px;height:8px;margin-left:-4px;border-radius:50%} /* 日内位置点 */
+  .rg .tick{position:absolute;top:-2px;bottom:-2px;width:1px;background:#7d8fa3} /* ▏今开 */
+  .gz b.up,.rg b.up{background:var(--up)} .gz b.dn,.rg b.dn{background:var(--down)}
+  .gz b.ff,.rg b.ff{background:#ffb454} .gz b.zz{background:#3d4f63} .gz b.ac{background:var(--accent,#4f8cff)}
+  .gz.dim,.rg.dim{opacity:.35}
+  td.off .gz,td.off .rg{opacity:.3} /* 规则停用整格压暗 */
+  tr.fire td{background:rgba(255,180,84,.05)}
+  tr.fire td:first-child{box-shadow:inset 2px 0 0 #ffb454} /* 越限行左侧琥珀条 */
+  .ev{font:500 11px/1 var(--mono)} /* 推送历史事件类型色:触发琥珀/回落蓝/测试灰 */
+  .ev.f{color:#ffb454} .ev.r{color:var(--accent,#4f8cff)} .ev.t{color:#5f6f80}
+  /* 2026-10-19 二改:市场面板并排双栏 + 数据绑定的微动画(全 CSS keyframes,theme 的 prefers-reduced-motion 自动熔断,勿加 JS) */
+  .mgrid{display:grid;grid-template-columns:1fr 1fr;gap:0 16px;align-items:start}
+  @media(max-width:1100px){.mgrid{grid-template-columns:1fr}} /* 断点宁高勿低:双栏放不下 6 列规表(手机视口 ~690 也走堆叠) */
+  @media(max-width:1400px) and (min-width:1101px){th,td{padding-left:9px;padding-right:9px}} /* 笔记本双栏带宽带再收紧 padding */
+  .sub{padding:12px 18px 0;font:600 10.5px/1 var(--mono);letter-spacing:.1em;color:#5f6f80} /* 面板内小节题(检测参数) */
+  .hb{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--up);margin:0 6px 0 2px;vertical-align:1px;animation:hbPulse 2.2s ease-out infinite} /* 采样心跳=活着的数据 */
+  @keyframes hbPulse{0%{box-shadow:0 0 0 0 rgba(88,214,141,.4)}70%{box-shadow:0 0 0 7px rgba(88,214,141,0)}100%{box-shadow:0 0 0 0 rgba(88,214,141,0)}}
+  .gz b{animation:gRow .55s ease-out;transform-origin:0 50%} /* 规从"无"长出来;每轮采样重放=心跳感 */
+  .gz b.lf{transform-origin:100% 50%} /* 左半填充反向展开,两端都贴中线 */
+  @keyframes gRow{from{transform:scaleX(0)}}
+  .rg b{animation:dotIn .5s ease-out}
+  @keyframes dotIn{from{transform:scale(0)}}
+  .pill.fire{animation:pillPop .4s ease-out} /* 越限药丸出现时轻弹一次 */
+  @keyframes pillPop{from{transform:scale(.85);opacity:.4}}
+  @keyframes fireGlow{50%{box-shadow:inset 2px 0 0 #ffb454, inset 60px 0 26px -26px rgba(255,180,84,.16)}}
+  tr.fire td:first-child{animation:fireGlow 2.6s ease-in-out infinite} /* 越限行慢呼吸(仅"正在越限"存在时,回落即静止) */
+  .pill{display:inline-block;font:500 10.5px/1 var(--mono);padding:4px 8px;border-radius:999px;border:1px solid var(--border);color:#7d8fa3;white-space:nowrap}
+  .pill.ok{color:#5f7186}
+  .pill.fire{color:#0f141c;background:#ffb454;border-color:#ffb454;font-weight:600}
+  .pill.off{color:#4a586a}
+  .strip{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;padding:12px 18px;border-bottom:1px solid var(--border);font-size:12px;color:#7d8fa3}
+  .strip .kv b{color:#c9d6e5;font-family:var(--mono)}
+  .strip .kv{font-family:var(--mono)}
+  /* 表单:复选+数字同格 */
+  .cbx{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:#9db1c7;font-family:var(--sans)}
+  .cbx input{accent-color:var(--accent,#4f8cff)}
+  td input[type=number]{width:64px;background:#10161f;border:1px solid var(--border);border-radius:6px;color:#e8eef5;padding:6px 8px;font:13px var(--mono);text-align:right}
+  td input[type=number]:focus{outline:1px solid var(--accent,#4f8cff)}
+  /* 分组小节头(2026-10-19 用户要求两块分开放):蓝 mono 板块题 + 成员名 + 右挂推送群 webhook 态 */
+  .gcap{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;padding:15px 18px 7px;font-family:var(--mono)}
+  .gcap:not(:first-child){border-top:1px dashed #1d2733;margin-top:10px}
+  .gcap b{font-size:12.5px;letter-spacing:.1em;color:var(--accent,#4f8cff)}
+  .gcap small{font-family:var(--sans);font-size:11px;color:#5f7186}
+  .gcap .whl{margin-left:auto;font-size:11px;color:#7d8fa3;white-space:nowrap}
+  /* 推送历史市场筛选胶囊 */
+  .frow{display:flex;flex-wrap:wrap;gap:8px;padding:2px 18px 10px}
+  .fpill{background:none;border:1px solid var(--border);border-radius:999px;color:#7d8fa3;font:500 11.5px var(--mono);padding:5px 13px;cursor:pointer}
+  .fpill:hover{border-color:#3d4f63;color:#c9d6e5}
+  .fpill.on{color:#0f141c;background:var(--accent,#4f8cff);border-color:var(--accent,#4f8cff);font-weight:600}
+  .gline{display:flex;flex-wrap:wrap;gap:10px 22px;align-items:center;padding:14px 18px;border-top:1px solid var(--border)}
+  /* 定时任务面板(2026-10-19):名称下挂说明行;计划时间用原生 time 输入 */
+  td.jn small{display:block;font:400 10.5px/1.5 var(--mono);color:#5f6f80;white-space:normal}
+  td input[type=time]{width:88px;background:#10161f;border:1px solid var(--border);border-radius:6px;color:#e8eef5;padding:6px 8px;font:13px var(--mono);text-align:center}
+  td input[type=time]:focus{outline:1px solid var(--accent,#4f8cff)}
+  .go{background:#16202e;border:1px solid var(--border);border-radius:7px;color:#e8eef5;font-size:12.5px;padding:7px 16px;cursor:pointer}
+  .go:hover{border-color:#3d4f63}
+  .wline{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;padding:12px 18px;font-size:12px;color:#7d8fa3}
+  .wline code{color:#9db1c7}
+  .msg{color:#c9d6e5;font-family:var(--sans)}
+  #who .pill{margin-left:8px}
+  @media(max-width:640px){
+    .gcap{padding:11px 12px 5px}
+    .gcap .whl{margin-left:0}
+    .frow{padding:2px 12px 8px}
+    td input[type=time]{width:76px}
+    th,td{padding:8px 9px;font-size:12px}
+    td input[type=number]{width:54px}
+    .strip{gap:6px 12px;padding:10px 12px}
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><span class="dot"></span><h1>异动监控</h1></div>
+  <nav>
+    <a href="hub.html">总览</a>
+    <a href="crypto.html">币圈</a>
+    <a href="stock.html">A股</a>
+    <a href="dashboard.html">我的财富<span class="lk">🔒</span></a>
+    <a href="cashflow.html">流水<span class="lk">🔒</span></a>
+    <a href="holdings.html">持仓<span class="lk">🔒</span></a>
+    <a href="monitor.html">监控<span class="lk">🔒</span></a>
+  </nav>
+  <div class="pills"><button id="refresh">刷新</button></div>
+  <div class="who" id="who"></div>
+</header>
+<div class="status" id="status"></div>
+
+<!-- 2026-10-19 二改(用户「按类型集中放、版面自己搭配」):每市场一块面板=看板+检测参数,并排双栏;全局态独立 -->
+<div class="mgrid">
+<section class="panel" id="m-cry">
+  <div class="phead"><div class="eyebrow">Crypto Monitor</div><h2>币圈 · 异动检测</h2></div>
+  <div id="pcry"></div>
+</section>
+<section class="panel" id="m-ast">
+  <div class="phead"><div class="eyebrow">A-Share Monitor</div><h2>A股 · 异动检测</h2></div>
+  <div id="past"></div>
+</section>
+</div>
+
+<section class="panel" id="m-etf">
+  <div class="phead"><div class="eyebrow">Official Bid Watch</div><h2>上证宽基 ETF · 暴量监控</h2></div>
+  <div id="petf"></div>
+</section>
+
+<section class="panel" id="m-glob">
+  <div class="phead"><div class="eyebrow">Global</div><h2>运行状态与推送</h2></div>
+  <div class="strip" id="strip"></div>
+  <div class="gline" id="glob"></div>
+  <div class="wline">📮 测试推送到群(webhook 状态见各市场面板小节头):<button class="go" id="testbtn" type="button">测试币圈群</button><button class="go" id="testbtn-a" type="button">测试A股群</button><span class="msg" id="msg"></span></div>
+</section>
+
+<section class="panel" id="m-jobs">
+  <div class="phead"><div class="eyebrow">Scheduled Jobs</div><h2>定时任务 · ~/claude/somejob</h2></div>
+  <div id="jobs" style="padding-top:10px"></div>
+  <div class="wline">⏰ 任务真身=launchd plist(<code>~/claude/somejob/plists</code>,LaunchAgents 里是符号链接);改时间即时重载生效,「立即运行」当场跑一轮(<b>会真实推群</b>);「停用」只到下次重启计算机。<span class="msg" id="jobsmsg"></span></div>
+</section>
+
+<section class="panel" id="m-history">
+  <div class="phead"><div class="eyebrow">History</div><h2>推送历史</h2></div>
+  <div id="hist" style="padding-top:10px"></div>
+</section>
+
+<p class="foot">监控口径:<b>币圈</b>=币安 1 分钟K(BTC/BNB/ETH/SOL)+ OKX(OKB,币安无现货),日内涨跌/振幅基于 1 小时K(日高日低最长滞后 1 小时);<b>A股</b>=腾讯当日分钟线出窗口涨跌、实时盘口出今开/日高/日低(无滞后),<b>周末/节假日/盘前不采样不判定</b>(盘口时间戳非北京今日则整只跳过,防旧行情误报)。均每 60 秒采样;窗口涨跌=末根收盘 vs 往前 N 分钟收盘。一段异动只报一次:越限触发推「异动」、回落推「恢复」(可全局关),持续越限不重复刷屏。<b>2026-10-18 前的历史不补判</b>;dev 与 prod 同跑会双进程采样,跃变去重靠共享状态文件 <code>runtime/monitor_state.json</code> 兜底。推送分群:币圈→「币圈小剧场」、A股→「A股大舞台」;<b>ETF 暴量</b>(2026-10-29)=上证宽基 ETF 量比 ≥ 阈值且今日成交额 ≥ 门槛才推,开盘 20 分钟内不判,清单 <code>data/etf_watch.json</code>;凭据写在 <code>~/.lark_webhook</code> 里用 <code>## 群名</code> 分段(2026-10-19 用户格式,A股也可写独立的 <code>~/.lark_webhook_astock</code>),env <code>LARK_WEBHOOK(_ASTOCK)</code> 优先;均 chmod 600,不入库不入仓库,页面不提供改地址入口。</p>
+<script src="nav.js?v=20261018a"></script>
+<script src="monitor.js?v=20261029a"></script>
+</body>
+</html>
